@@ -51,7 +51,11 @@ def setup_cognee_env() -> None:
     cognee.config.system_root_directory = os.path.expanduser("~/.cognee")
     cognee.config.data_root_directory = os.path.expanduser("~/.cognee")
 
-    # Bypass LanceDB disk spilling on Windows to prevent Datafusion spill write crashes
+    # Bypass LanceDB disk spilling on Windows and configure datafusion to use a safe local temp folder without compression
+    temp_dir = os.path.expanduser("~/.cognee/temp")
+    os.makedirs(temp_dir, exist_ok=True)
+    os.environ["DATAFUSION_RUNTIME_TEMP_DIR"] = temp_dir
+    os.environ["DATAFUSION_EXECUTION_SPILL_COMPRESSION"] = "uncompressed"
     os.environ["LANCE_BYPASS_SPILLING"] = "true"
 
     # LLM: Google Gemini via AI Studio
