@@ -1,0 +1,104 @@
+{
+  "name": "copepod-vscode",
+  "displayName": "Copepod — Repository Memory",
+  "description": "Institutional memory for GitHub repositories. Shows PR decision graphs, issue traces, and trust scores for your code.",
+  "version": "0.1.0",
+  "publisher": "copepod",
+  "engines": {
+    "vscode": "^1.85.0"
+  },
+  "categories": ["Other", "Visualization"],
+  "activationEvents": [
+    "workspaceContains:.git"
+  ],
+  "main": "./out/extension.js",
+  "contributes": {
+    "viewsContainers": {
+      "activitybar": [
+        {
+          "id": "copepod",
+          "title": "Copepod",
+          "icon": "media/icon.svg"
+        }
+      ]
+    },
+    "views": {
+      "copepod": [
+        {
+          "type": "webview",
+          "id": "copepod.graphView",
+          "name": "Decision Graph"
+        },
+        {
+          "id": "copepod.repoInfo",
+          "name": "Repository"
+        }
+      ]
+    },
+    "commands": [
+      {
+        "command": "copepod.refresh",
+        "title": "Copepod: Refresh Graph",
+        "icon": "$(refresh)"
+      },
+      {
+        "command": "copepod.configure",
+        "title": "Copepod: Configure Connection"
+      },
+      {
+        "command": "copepod.showFileGraph",
+        "title": "Copepod: Show Decision Graph for This File"
+      }
+    ],
+    "menus": {
+      "view/title": [
+        {
+          "command": "copepod.refresh",
+          "when": "view == copepod.graphView",
+          "group": "navigation"
+        }
+      ],
+      "editor/context": [
+        {
+          "command": "copepod.showFileGraph",
+          "group": "copepod"
+        }
+      ]
+    },
+    "configuration": {
+      "title": "Copepod",
+      "properties": {
+        "copepod.apiUrl": {
+          "type": "string",
+          "default": "http://localhost:8000",
+          "description": "Copepod backend API URL"
+        },
+        "copepod.apiKey": {
+          "type": "string",
+          "default": "",
+          "description": "Copepod API key (from Studio → Settings)"
+        },
+        "copepod.repoId": {
+          "type": "string",
+          "default": "",
+          "description": "Copepod repository ID (auto-detected or manual)"
+        },
+        "copepod.autoDetectRepo": {
+          "type": "boolean",
+          "default": true,
+          "description": "Auto-detect repository from .git config"
+        }
+      }
+    }
+  },
+  "scripts": {
+    "vscode:prepublish": "npm run compile",
+    "compile": "tsc -p ./",
+    "watch": "tsc -watch -p ./"
+  },
+  "devDependencies": {
+    "@types/vscode": "^1.85.0",
+    "@types/node": "^20.0.0",
+    "typescript": "^5.3.0"
+  }
+}

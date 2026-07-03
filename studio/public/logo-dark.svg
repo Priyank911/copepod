@@ -1,0 +1,82 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="100%" height="100%">
+  <!-- Transparent background bold logo with permanently dark lines for light theme pages -->
+  <defs>
+    <style>
+      .graph-edge { stroke: #000000; stroke-width: 14; stroke-linecap: round; stroke-linejoin: round; fill: none; }
+      .graph-edge-subtle { stroke: #000000; stroke-width: 8; stroke-linecap: round; stroke-linejoin: round; fill: none; }
+      .graph-node { fill: #ffffff; stroke: #000000; stroke-width: 8; }
+      .graph-node-hub { fill: #2563eb; stroke: #000000; stroke-width: 10; }
+      .graph-node-leaf { fill: #000000; stroke: none; }
+    </style>
+  </defs>
+
+  <!-- Cephalosome / Antennae framework -->
+  <g>
+    <!-- Left Antenna Segments -->
+    <path d="M 256 120 C 210 100, 180 80, 180 80 C 180 80, 130 90, 90 110 C 90 110, 60 140, 40 180" class="graph-edge" />
+    <!-- Right Antenna Segments -->
+    <path d="M 256 120 C 302 100, 332 80, 332 80 C 332 80, 382 90, 422 110 C 422 110, 452 140, 472 180" class="graph-edge" />
+
+    <!-- Main Body spine -->
+    <line x1="256" y1="120" x2="256" y2="210" class="graph-edge" />
+    <line x1="256" y1="210" x2="256" y2="300" class="graph-edge" />
+    <line x1="256" y1="300" x2="256" y2="380" class="graph-edge" />
+    <line x1="256" y1="380" x2="256" y2="440" class="graph-edge" />
+
+    <!-- Side thoracic connections -->
+    <path d="M 256 120 L 190 210 L 256 210" class="graph-edge-subtle" />
+    <path d="M 256 120 L 322 210 L 256 210" class="graph-edge-subtle" />
+    <path d="M 190 210 L 195 300 L 256 300" class="graph-edge-subtle" />
+    <path d="M 322 210 L 317 300 L 256 300" class="graph-edge-subtle" />
+
+    <!-- Swimming legs (Pereiopods) -->
+    <!-- Leg set 1 -->
+    <path d="M 190 210 C 150 240, 140 280, 140 280" class="graph-edge-subtle" />
+    <path d="M 322 210 C 362 240, 372 280, 372 280" class="graph-edge-subtle" />
+    <!-- Leg set 2 -->
+    <path d="M 195 300 C 160 340, 150 390, 150 390" class="graph-edge-subtle" />
+    <path d="M 317 300 C 352 340, 362 390, 362 390" class="graph-edge-subtle" />
+
+    <!-- Caudal Rami (Tail Spines) -->
+    <line x1="256" y1="440" x2="210" y2="490" class="graph-edge" />
+    <line x1="256" y1="440" x2="302" y2="490" class="graph-edge" />
+  </g>
+
+  <!-- Nodes (Sensors, Junctions, Hubs) -->
+  <g>
+    <!-- Central Head Hub -->
+    <circle cx="256" cy="120" r="24" class="graph-node-hub" />
+
+    <!-- Antenna Joint Nodes -->
+    <circle cx="180" cy="80" r="14" class="graph-node" />
+    <circle cx="90" cy="110" r="12" class="graph-node" />
+    <circle cx="40" cy="180" r="10" class="graph-node" />
+
+    <circle cx="332" cy="80" r="14" class="graph-node" />
+    <circle cx="422" cy="110" r="12" class="graph-node" />
+    <circle cx="472" cy="180" r="10" class="graph-node" />
+
+    <!-- Thoracic Nodes -->
+    <circle cx="190" cy="210" r="16" class="graph-node" />
+    <circle cx="322" cy="210" r="16" class="graph-node" />
+    <circle cx="256" cy="210" r="20" class="graph-node-hub" />
+
+    <circle cx="195" cy="300" r="14" class="graph-node" />
+    <circle cx="317" cy="300" r="14" class="graph-node" />
+    <circle cx="256" cy="300" r="18" class="graph-node" />
+
+    <!-- Leg ends -->
+    <circle cx="140" cy="280" r="8" class="graph-node-leaf" />
+    <circle cx="372" cy="280" r="8" class="graph-node-leaf" />
+    <circle cx="150" cy="390" r="8" class="graph-node-leaf" />
+    <circle cx="362" cy="390" r="8" class="graph-node-leaf" />
+
+    <!-- Abdomen & Tail segment junctions -->
+    <circle cx="256" cy="380" r="15" class="graph-node" />
+    <circle cx="256" cy="440" r="14" class="graph-node-hub" />
+
+    <!-- Caudal Rami End Points -->
+    <circle cx="210" cy="490" r="10" class="graph-node-leaf" />
+    <circle cx="302" cy="490" r="10" class="graph-node-leaf" />
+  </g>
+</svg>

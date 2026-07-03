@@ -1,0 +1,497 @@
+@import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@300;400;500;600;700&display=swap');
+
+:root {
+  /* ── RayCAD-inspired Engineering Blueprint Theme ───────────────── */
+  --cpd-bg: #f5f3ef;
+  --cpd-bg-alt: #edeae4;
+  --cpd-surface: #ffffff;
+  --cpd-text-primary: #1a1a1a;
+  --cpd-text-secondary: rgba(26, 26, 26, 0.6);
+  --cpd-text-tertiary: rgba(26, 26, 26, 0.35);
+  --cpd-divider: rgba(26, 26, 26, 0.1);
+  --cpd-divider-strong: rgba(26, 26, 26, 0.2);
+  --cpd-accent: #2563eb;
+  --cpd-accent-soft: rgba(37, 99, 235, 0.08);
+  --cpd-green: #16a34a;
+  --cpd-yellow: #ca8a04;
+  --cpd-red: #dc2626;
+  --cpd-focus: rgba(37, 99, 235, 0.5);
+
+  /* ── Studio Dark Mode (for chat) ──────────────────────────────── */
+  --studio-bg: #0c0c0e;
+  --studio-surface: #161618;
+  --studio-surface-hover: #1e1e21;
+  --studio-border: rgba(255, 255, 255, 0.07);
+  --studio-text: #e4e4e7;
+  --studio-text-dim: rgba(228, 228, 231, 0.5);
+  --studio-accent: #818cf8;
+
+  --font-mono: 'JetBrains Mono', 'Fira Code', 'SF Mono', monospace;
+}
+
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+html {
+  font-family: var(--font-mono);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+body {
+  background: var(--cpd-bg);
+  color: var(--cpd-text-primary);
+  min-height: 100vh;
+}
+
+/* ── Grid Overlay (Engineering sheet dot-grid aesthetic) ──────── */
+.grid-overlay {
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 1;
+  opacity: 0.15;
+  background-image: radial-gradient(var(--cpd-divider-strong) 1.5px, transparent 1.5px);
+  background-size: 20px 20px;
+}
+
+/* ── Blueprint Layout Wrapper ────────────────────────────────── */
+.blueprint-viewport {
+  position: relative;
+  z-index: 2;
+  display: flex;
+  flex-direction: column;
+  box-sizing: border-box;
+  background: var(--cpd-bg);
+  padding: 16px;
+  gap: 12px;
+}
+
+@media (min-width: 769px) {
+  .blueprint-viewport {
+    height: 100vh;
+    max-height: 100vh;
+    overflow: hidden;
+  }
+}
+
+/* ── Technical Header ────────────────────────────────────────── */
+.blueprint-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-end;
+  padding-bottom: 12px;
+  border-bottom: 1px dashed var(--cpd-divider-strong);
+  flex-shrink: 0;
+}
+
+.blueprint-header-title {
+  font-size: 22px;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  text-transform: uppercase;
+  line-height: 1.1;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.blueprint-header-meta {
+  font-size: 10px;
+  color: var(--cpd-text-tertiary);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  text-align: right;
+  line-height: 1.4;
+}
+
+/* ── Grid Sheet ──────────────────────────────────────────────── */
+.blueprint-grid {
+  display: grid;
+  gap: 0px;
+  flex: 1;
+  min-height: 0; /* Important for flex-grow with inner scroll */
+  border-top: 1px dashed var(--cpd-divider-strong);
+  border-left: 1px dashed var(--cpd-divider-strong);
+}
+
+@media (min-width: 769px) {
+  .blueprint-grid {
+    grid-template-columns: 1.2fr 1fr 1fr;
+    grid-template-rows: 1.2fr 1.1fr 1fr;
+  }
+}
+
+@media (max-width: 768px) {
+  .blueprint-grid {
+    grid-template-columns: 1fr;
+    auto-rows: auto;
+    overflow-y: auto;
+  }
+}
+
+/* ── Drawing Box ─────────────────────────────────────────────── */
+.sheet-box {
+  background: var(--cpd-bg);
+  padding: 1.25rem;
+  position: relative;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  border-right: 1px dashed var(--cpd-divider-strong);
+  border-bottom: 1px dashed var(--cpd-divider-strong);
+  overflow: hidden;
+}
+
+.sheet-heading {
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--cpd-text-primary);
+  padding-bottom: 0.375rem;
+  border-bottom: 1px dotted var(--cpd-divider-strong);
+  margin-bottom: 0.75rem;
+  flex-shrink: 0;
+}
+
+.sheet-content-scroll {
+  flex: 1;
+  overflow-y: auto;
+  min-height: 0; /* needed for layout */
+  padding-right: 6px;
+}
+
+.sheet-copy {
+  font-size: 12px;
+  line-height: 1.55;
+  color: var(--cpd-text-secondary);
+}
+
+.sheet-copy a {
+  color: var(--cpd-text-primary);
+  text-decoration: underline;
+  text-decoration-thickness: 1px;
+  text-underline-offset: 2px;
+}
+
+.sheet-copy a:hover {
+  color: var(--cpd-accent);
+}
+
+/* ── Hatched Background (RayCAD style) ──────────────────────── */
+.hatched-bg {
+  background: var(--cpd-bg)
+    repeating-linear-gradient(
+      -45deg,
+      transparent,
+      transparent 6px,
+      var(--cpd-divider) 6px,
+      var(--cpd-divider) 7px
+    );
+}
+
+/* ── Buttons ──────────────────────────────────────────────────── */
+.btn-primary {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0.5rem 1rem;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  border: 1px solid var(--cpd-text-primary);
+  background: var(--cpd-text-primary);
+  color: var(--cpd-bg) !important;
+  cursor: pointer;
+  transition: all 120ms ease-out;
+  text-decoration: none !important;
+  box-shadow: 2px 2px 0px var(--cpd-divider-strong);
+}
+
+.btn-primary:hover {
+  background: transparent;
+  color: var(--cpd-text-primary) !important;
+  transform: translate(1px, 1px);
+  box-shadow: 1px 1px 0px var(--cpd-divider-strong);
+}
+
+.btn-secondary {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0.5rem 1rem;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  border: 1px solid var(--cpd-divider-strong);
+  background: transparent;
+  color: var(--cpd-text-primary);
+  cursor: pointer;
+  transition: all 120ms ease-out;
+  text-decoration: none;
+}
+
+.btn-secondary:hover {
+  border-color: var(--cpd-text-primary);
+  background: var(--cpd-bg-alt);
+}
+
+/* ── Status Badges ────────────────────────────────────────────── */
+.badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 1px 6px;
+  font-size: 10px;
+  font-weight: 600;
+  border-radius: 0px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  border: 1px solid currentColor;
+}
+
+.badge-green {
+  background: rgba(22, 163, 74, 0.06);
+  color: var(--cpd-green);
+}
+
+.badge-yellow {
+  background: rgba(202, 138, 4, 0.06);
+  color: var(--cpd-yellow);
+}
+
+.badge-red {
+  background: rgba(220, 38, 38, 0.06);
+  color: var(--cpd-red);
+}
+
+/* ── Studio Layout (Dark Theme) ───────────────────────────────── */
+.studio-layout {
+  display: flex;
+  height: 100vh;
+  background: var(--studio-bg);
+  color: var(--studio-text);
+}
+
+.studio-sidebar {
+  width: 260px;
+  border-right: 1px solid var(--studio-border);
+  display: flex;
+  flex-direction: column;
+  background: var(--studio-surface);
+}
+
+.studio-sidebar-header {
+  padding: 1rem 1.25rem;
+  border-bottom: 1px solid var(--studio-border);
+  font-size: 14px;
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.studio-sidebar-list {
+  flex: 1;
+  overflow-y: auto;
+  padding: 0.5rem;
+}
+
+.studio-repo-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 0.5rem 0.75rem;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 13px;
+  color: var(--studio-text-dim);
+  transition: all 120ms ease;
+}
+
+.studio-repo-item:hover,
+.studio-repo-item.active {
+  background: var(--studio-surface-hover);
+  color: var(--studio-text);
+}
+
+.studio-main {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.studio-chat {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.studio-messages {
+  flex: 1;
+  overflow-y: auto;
+  padding: 1.5rem;
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.studio-input-area {
+  padding: 1rem 1.5rem;
+  border-top: 1px solid var(--studio-border);
+}
+
+.studio-input {
+  width: 100%;
+  padding: 0.75rem 1rem;
+  font-family: var(--font-mono);
+  font-size: 13px;
+  background: var(--studio-surface);
+  border: 1px solid var(--studio-border);
+  border-radius: 8px;
+  color: var(--studio-text);
+  outline: none;
+  transition: border-color 160ms ease;
+}
+
+.studio-input:focus {
+  border-color: var(--studio-accent);
+}
+
+.studio-input::placeholder {
+  color: var(--studio-text-dim);
+}
+
+/* ── Chat Messages ────────────────────────────────────────────── */
+.msg {
+  max-width: 720px;
+  font-size: 13px;
+  line-height: 1.7;
+}
+
+.msg-user {
+  align-self: flex-end;
+  background: var(--studio-accent);
+  color: #fff;
+  padding: 0.625rem 1rem;
+  border-radius: 12px 12px 2px 12px;
+}
+
+.msg-bot {
+  align-self: flex-start;
+  background: var(--studio-surface);
+  border: 1px solid var(--studio-border);
+  padding: 0.875rem 1rem;
+  border-radius: 2px 12px 12px 12px;
+}
+
+.msg-citation {
+  display: inline-flex;
+  align-items: center;
+  padding: 1px 6px;
+  margin: 0 2px;
+  font-size: 11px;
+  font-weight: 600;
+  background: rgba(129, 140, 248, 0.15);
+  color: var(--studio-accent);
+  border-radius: 3px;
+  cursor: pointer;
+  transition: background 120ms ease;
+}
+
+.msg-citation:hover {
+  background: rgba(129, 140, 248, 0.25);
+}
+
+/* ── Source Panel ──────────────────────────────────────────────── */
+.source-panel {
+  width: 320px;
+  border-left: 1px solid var(--studio-border);
+  background: var(--studio-surface);
+  overflow-y: auto;
+  padding: 1.25rem;
+}
+
+.source-card {
+  background: var(--studio-bg);
+  border: 1px solid var(--studio-border);
+  border-radius: 6px;
+  padding: 1rem;
+  margin-bottom: 0.75rem;
+}
+
+.source-card-title {
+  font-size: 13px;
+  font-weight: 600;
+  margin-bottom: 0.5rem;
+}
+
+.source-card-meta {
+  font-size: 11px;
+  color: var(--studio-text-dim);
+  line-height: 1.5;
+}
+
+/* ── Animations ───────────────────────────────────────────────── */
+@keyframes fadeInUp {
+  from {
+    opacity: 0;
+    transform: translateY(12px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.fade-in-up {
+  animation: fadeInUp 0.4s ease-out forwards;
+}
+
+@keyframes shimmer {
+  0% { background-position: -200% 0; }
+  100% { background-position: 200% 0; }
+}
+
+.progress-shimmer {
+  background: linear-gradient(90deg, var(--cpd-accent) 0%, #60a5fa 50%, var(--cpd-accent) 100%);
+  background-size: 200% 100%;
+  animation: shimmer 1.5s ease-in-out infinite;
+}
+
+@keyframes pulse-dot {
+  0%, 100% { opacity: 0.4; }
+  50% { opacity: 1; }
+}
+
+.pulse-dot {
+  animation: pulse-dot 1.5s ease-in-out infinite;
+}
+
+/* ── Scrollbar ────────────────────────────────────────────────── */
+::-webkit-scrollbar {
+  width: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--cpd-divider-strong);
+  border-radius: 3px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--cpd-text-tertiary);
+}

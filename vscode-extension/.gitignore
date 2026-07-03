@@ -1,0 +1,10 @@
+# VS Code Extension files to ignore
+node_modules/
+out/
+.vscode-test/
+*.vsix
+*.tsbuildinfo
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.DS_Store

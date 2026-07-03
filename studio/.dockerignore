@@ -1,0 +1,6 @@
+# Copepod Studio Docker ignore
+node_modules
+.next
+.git
+.gitignore
+*.md
