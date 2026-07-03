@@ -1,10 +1,23 @@
-"""
-Copepod Backend — FastAPI application factory.
-
-Brings together all routers, middleware, and startup logic.
-"""
-
 from __future__ import annotations
+
+import os
+import sys
+
+# Sanitize Windows PATH to avoid cygwin/msys2/git-usr DLL conflicts at startup.
+# This prevents fatal crashes like "TP_NUM_C_BUFS too small: 50" or hangs caused by
+# python loading msys2/git-usr DLLs from the system PATH.
+if sys.platform == "win32":
+    path = os.environ.get("PATH", "")
+    parts = path.split(os.pathsep)
+    clean_parts = []
+    for part in parts:
+        lower_part = part.lower()
+        if "git\\usr" in lower_part or "git/usr" in lower_part:
+            continue
+        if "msys" in lower_part or "cygwin" in lower_part:
+            continue
+        clean_parts.append(part)
+    os.environ["PATH"] = os.pathsep.join(clean_parts)
 
 import logging
 from contextlib import asynccontextmanager

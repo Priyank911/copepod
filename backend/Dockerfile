@@ -15,14 +15,15 @@ RUN pip install --no-cache-dir -e . 2>/dev/null || pip install --no-cache-dir \
     "uvicorn[standard]>=0.30.0" \
     "sqlalchemy[asyncio]>=2.0.0" \
     "aiosqlite>=0.20.0" \
-    "cognee>=0.1.0" \
+    "cognee[fastembed]>=0.1.0" \
+    "fastembed>=0.3.0" \
     "PyGithub>=2.3.0" \
     "httpx>=0.27.0" \
     "python-jose[cryptography]>=3.3.0" \
     "cryptography>=42.0.0" \
     "pydantic-settings>=2.3.0" \
     "sse-starlette>=2.0.0" \
-    "groq>=0.9.0" \
+    "google-genai>=1.0.0" \
     "python-multipart>=0.0.9"
 
 # Copy application code

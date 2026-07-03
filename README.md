@@ -1,55 +1,121 @@
-<p align="center">
-  <img src="https://raw.githubusercontent.com/topoteretes/cognee/main/docs/img/cognee_logo.png" width="280" alt="Cognee Logo" />
-</p>
-
-<h1 align="center">🦐 Copepod</h1>
+# 🦐 Copepod — The Institutional Memory Layer for GitHub Repositories
 
 <p align="center">
-  <strong>The Institutional Memory Layer for GitHub Repositories</strong>
+  <img src="docs/assets/banner.png" alt="Copepod" width="600">
 </p>
 
 <p align="center">
-  <a href="https://github.com/topoteretes/cognee">
-    <img src="https://img.shields.io/badge/Memory%20Engine-Cognee-blueviolet?style=flat-square" alt="Memory Engine: Cognee" />
-  </a>
-  <img src="https://img.shields.io/badge/License-MIT-blue.svg?style=flat-square" alt="License: MIT" />
-  <img src="https://img.shields.io/badge/PRs-Welcome-brightgreen.svg?style=flat-square" alt="PRs Welcome" />
-  <img src="https://img.shields.io/badge/Built%20For-Cognee%20Hackathon%202026-ff69b4?style=flat-square" alt="Built For: Cognee Hackathon" />
+  <strong>DIGEST! REMEMBER! RECALL!</strong>
 </p>
+
+<p align="center">
+  <a href="https://github.com/topoteretes/cognee"><img src="https://img.shields.io/badge/Memory%20Engine-Cognee-blueviolet?style=for-the-badge" alt="Memory Engine: Cognee" /></a>
+  <img src="https://img.shields.io/badge/License-MIT-blue.svg?style=for-the-badge" alt="License: MIT" />
+  <img src="https://img.shields.io/badge/PRs-Welcome-brightgreen.svg?style=for-the-badge" alt="PRs Welcome" />
+  <img src="https://img.shields.io/badge/Built%20For-Cognee%20Hackathon%202026-ff69b4?style=for-the-badge" alt="Built For: Cognee Hackathon" />
+</p>
+
+**Copepod** is the _institutional memory layer_ for GitHub repositories, powered by [Cognee](https://github.com/topoteretes/cognee). 
+
+Every engineering team accumulates invisible context over time—why a bug-like line is actually a critical workaround, or why a simple approach was rejected. When developers leave or production breaks at 2 AM, this context vanishes. **Copepod solves developer amnesia.** 
+
+It ingests your repository's entire history (PRs, issues, AST code structure), builds a semantic knowledge graph using Cognee, and exposes it through three intuitive interfaces: a **Web Studio**, an **MCP Server**, and an interactive **VS Code Graph Sidebar**.
 
 ---
 
-## 💡 What is Copepod?
+[Web Studio](studio) · [FastAPI Backend](backend) · [MCP Server](mcp-server) · [VS Code Extension](vscode-extension) · [Docs](docs) · [Cognee Engine](https://github.com/topoteretes/cognee)
 
-Every software engineering team accumulates **invisible context** over time:
-* Why a particular function was written defensively with complex try-catch statements.
-* Why a simpler approach was rejected in favor of a more elaborate design pattern.
-* Why a line of code that looks like a bug is actually a critical workaround for an undocumented API limitation.
+New install? Start here: [Docker Quick Start](#-docker-quick-start-one-command) or run the setup locally with `docker compose up --build`.
 
-This context is the team's **institutional memory**. Unfortunately, it is scattered across transient channels: pull request descriptions, code review comments, closed issue threads, and developers' heads. When engineers leave, or a production outage strikes at 2 AM, this context is gone.
+---
 
-**Copepod solves developer amnesia.** It ingests your repository's entire history (PRs, issues, AST code structure) and constructs a semantic knowledge graph using [Cognee](https://github.com/topoteretes/cognee) as the graph memory engine. It exposes this memory through three powerful interfaces: a **Web Studio**, an **MCP Server**, and an interactive **VS Code Graph Sidebar**.
+## 🛠️ Core Technology Stack
+
+<table align="center">
+  <tr>
+    <td align="center" width="16.66%">
+      <a href="https://github.com/topoteretes/cognee">
+        <img src="https://raw.githubusercontent.com/topoteretes/cognee/main/docs/img/cognee_logo.png" alt="Cognee" height="32">
+        <br><sub>Cognee</sub>
+      </a>
+    </td>
+    <td align="center" width="16.66%">
+      <a href="https://fastapi.tiangolo.com/">
+        <img src="https://cdn.simpleicons.org/fastapi/009688" alt="FastAPI" height="28">
+        <br><sub>FastAPI</sub>
+      </a>
+    </td>
+    <td align="center" width="16.66%">
+      <a href="https://nextjs.org/">
+        <img src="https://cdn.simpleicons.org/nextdotjs/000000/ffffff" alt="Next.js" height="28">
+        <br><sub>Next.js</sub>
+      </a>
+    </td>
+    <td align="center" width="16.66%">
+      <a href="https://code.visualstudio.com/">
+        <img src="https://cdn.simpleicons.org/visualstudiocode/007ACC" alt="VS Code" height="28">
+        <br><sub>VS Code</sub>
+      </a>
+    </td>
+    <td align="center" width="16.66%">
+      <a href="https://www.python.org/">
+        <img src="https://cdn.simpleicons.org/python/3776AB" alt="Python" height="28">
+        <br><sub>Python</sub>
+      </a>
+    </td>
+    <td align="center" width="16.66%">
+      <a href="https://www.docker.com/">
+        <img src="https://cdn.simpleicons.org/docker/2496ED" alt="Docker" height="28">
+        <br><sub>Docker</sub>
+      </a>
+    </td>
+  </tr>
+</table>
+
+---
+
+## 🐳 Docker Quick Start (One Command)
+
+Deploy the entire stack (FastAPI Backend + SQLite + Cognee DBs + Studio Web UI) locally in a single command:
+
+```bash
+# 1. Clone the project
+git clone https://github.com/your-org/copepod.git
+cd copepod
+
+# 2. Configure credentials
+cp backend/.env.example backend/.env
+# Open backend/.env and populate your GITHUB_CLIENT_ID, GITHUB_CLIENT_SECRET, and GROQ_API_KEY.
+
+# 3. Launch with Docker Compose
+docker compose up --build
+```
+
+* **Web Studio**: Access at `http://localhost:3000`
+* **FastAPI Backend Docs**: Access at `http://localhost:8000/docs`
+
+*To include the MCP server in your compose stack, run:*
+```bash
+docker compose --profile mcp up --build
+```
 
 ---
 
 ## ⚡ Key Surfaces
 
-### 1. 🖥️ Web Studio (Next.js)
-A Next.js frontend built with a **minimalist, grid-based engineering blueprint aesthetic** inspired by drafting sheets.
-* Track repository ingestion progress in real-time using Server-Sent Events (SSE).
-* Chat with your repository's history to query developer intent.
-* View exact source citations linking answers back to the relevant PR numbers, issues, or code symbols.
+* **🖥️ Web Studio (Next.js)**: A Next.js frontend built with a minimalist, grid-based engineering blueprint aesthetic. Track repository ingestion progress in real-time using Server-Sent Events (SSE), chat with your repository's history, and view source citations linking answers back to PR numbers, issues, or code symbols.
+* **🔌 MCP Bridge (Model Context Protocol)**: Exposes the repository's institutional memory directly to your local AI coding assistants (like Claude Code, Cursor, Cline, or Copilot). Features tools like `ask(question)` and `file_context(file_path)` to query decision history before rewriting code.
+* **📐 VS Code Extension (Decision Graph)**: A custom sidebar containing an interactive SVG-based node hierarchy graph. Includes auto-detection of the active repository, visual traces connecting files to PRs and issues, and a Code Trust Scorer (0.0 - 1.0) calculating code stability based on commit recency and regression history.
 
-### 2. 🔌 MCP Bridge (Model Context Protocol)
-Exposes the repository's institutional memory directly to your local AI coding assistants (like **Claude Code, Cursor, Cline, or Copilot**).
-* **`ask(question)`**: Let AI agents query the repo's decision history before rewriting code.
-* **`file_context(file_path)`**: Instantly returns a structured breakdown of every pull request and issue that has ever modified the active file.
+---
 
-### 3. 📐 VS Code Extension (Decision Graph)
-A custom sidebar containing an **interactive SVG-based node hierarchy graph**.
-* **Auto-Detection**: Auto-detects the active repository by scanning `.git/config` for origin remotes.
-* **Visual Traces**: Renders a center file node connected to its modifying Pull Requests (left) and resolved Issues (right), featuring curved interactive paths and diamond gateway intersections.
-* **Code Trust Scorer**: Calculates a **Code Satisfaction Score (0.0 - 1.0)** for code stability based on recency, commits-since-merge, and regression history, visualised as green, yellow, or red trust bars.
+## Highlights
+
+* **🧠 Cognitive Memory Lifecycle** — Full structured lifecycle operations using Cognee's `remember()`, `recall()`, `improve()`, and `forget()` mechanisms.
+* **🔒 Isolated Datasets** — Deterministic namespace mapping (`copepod_{user_id}_{owner}_{repo}`) to ensure strict data separation per repository.
+* **⚙️ Zero-Cost Embedded DBs** — Runs local, embedded KuzuDB (graph) and LanceDB (vector) instances requiring $0 infrastructure cost.
+* **🧩 Python AST Parser** — Extracts functions, classes, decorators, docstrings, and call-graphs as declarative memory statements automatically.
+* **⚡ Granular Payload Formatter** — Converts raw GitHub webhook and API JSON payloads into structured English sentences for high entity-extraction accuracy.
 
 ---
 
@@ -65,10 +131,10 @@ Copepod implements a complete memory lifecycle using Cognee's four core operatio
                                   │
                                   ▼
  ┌───────────────┐        ┌───────────────┐        ┌───────────────┐
- │    IMPROVE    │◄───────┤    RECALL     ├───────►│    FORGET     │
- │ Reinforce on  │        │ Ask Studio,   │        │ Prune deleted │
- │  merged PRs   │        │  MCP, VS Code │        │  files/repos  │
- └───────────────┘        └───────────────┘        └───────────────┘
+  │    IMPROVE    │◄───────┤    RECALL     ├───────►│    FORGET     │
+  │ Reinforce on  │        │ Ask Studio,   │        │ Prune deleted │
+  │  merged PRs   │        │  MCP, VS Code │        │  files/repos  │
+  └───────────────┘        └───────────────┘        └───────────────┘
 ```
 
 1. **`remember()` (Ingestion)**: Triggers during initial repository setup and incremental GitHub webhook events (PR merges, issue closures).
@@ -80,7 +146,7 @@ Copepod implements a complete memory lifecycle using Cognee's four core operatio
 
 ## 🏗️ Architecture & Zero-Cost Infrastructure
 
-Copepod is designed to run self-hosted with **$0 infrastructure cost**:
+Copepod runs entirely self-hosted:
 
 ```
                        ┌───────────────────────┐
@@ -109,37 +175,9 @@ Copepod is designed to run self-hosted with **$0 infrastructure cost**:
          └─────────────┘  └─────────────┘  └─────────────┘ └─────────────┘
 ```
 
-* **Dataset Isolation**: Uses deterministic names (`copepod_{user_id}_{owner}_{repo}`) to completely isolate graph datasets per repository.
-* **Granular Formatter**: Converts raw GitHub webhook and API JSON payloads into structured English sentences (`app/services/formatter.py`) to maximize Cognee's entity extraction accuracy.
-* **Python AST Parser**: Parses files syntax-by-syntax (`app/services/code_parser.py`) to extract functions, classes, decorators, docstrings, and call-graphs as memory statements.
-* **Embedded DBs**: Utilizes KuzuDB (graph) and LanceDB (vector) locally inside the Docker container, requiring zero external database hosting.
-
----
-
-## 🐳 Docker Quick Start (One Command)
-
-Deploy the entire stack (FastAPI Backend + SQLite + Cognee DBs + Studio Web UI) locally in a single command:
-
-```bash
-# 1. Clone the project
-git clone https://github.com/your-org/copepod.git
-cd copepod
-
-# 2. Configure credentials
-cp backend/.env.example backend/.env
-# Open backend/.env and populate your GITHUB_CLIENT_ID, GITHUB_CLIENT_SECRET, and GROQ_API_KEY.
-
-# 3. Launch with Docker Compose
-docker compose up --build
-```
-
-* **Web Studio**: Access at `http://localhost:3000`
-* **FastAPI Backend Docs**: Access at `http://localhost:8000/docs`
-
-*To include the MCP server in your compose stack, run:*
-```bash
-docker compose --profile mcp up --build
-```
+* **Embedded DBs**: Utilizes local KuzuDB and LanceDB inside the container.
+* **Python AST Parser**: Parses files syntax-by-syntax (`app/services/code_parser.py`) to map codebase relationships.
+* **Payload Formatter**: Translates webhook JSONs to semantic statements (`app/services/formatter.py`).
 
 ---
 
@@ -222,6 +260,13 @@ Where `.copepod/config.json` inside your project root contains:
 
 ---
 
+## 🦐 Copey
+
+Copepod was built for **Copey**, a digital space shrimp AI assistant. 🦐
+by the community.
+
+---
+
 ## 🤝 Contributing
 
 Contributions are what make the open-source community an amazing place to learn, inspire, and create.
@@ -230,6 +275,8 @@ Contributions are what make the open-source community an amazing place to learn,
 3. Commit your Changes (`git commit -m 'Add some AmazingFeature'`).
 4. Push to the Branch (`git push origin feature/AmazingFeature`).
 5. Open a Pull Request.
+
+AI/vibe-coded PRs welcome! 🤖
 
 ---
 

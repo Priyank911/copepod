@@ -17,6 +17,14 @@ import { useState, useRef, useEffect, FormEvent } from "react";
 
 const BACKEND_URL = process.env.NEXT_PUBLIC_BACKEND_URL || "http://localhost:8000";
 
+interface UserProfile {
+  id: number;
+  github_login: string;
+  github_name: string | null;
+  avatar_url: string | null;
+  api_key: string | null;
+}
+
 interface Repo {
   id: number;
   full_name: string;
@@ -46,12 +54,127 @@ export default function StudioPage() {
   const [sources, setSources] = useState<Source[]>([]);
   const [addRepoInput, setAddRepoInput] = useState("");
   const [addingRepo, setAddingRepo] = useState(false);
+  const [user, setUser] = useState<UserProfile | null>(null);
+  const [showApiKey, setShowApiKey] = useState(false);
+  const [repoProgress, setRepoProgress] = useState<Record<number, number>>({});
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const eventSourcesRef = useRef<Record<number, EventSource>>({});
 
   // Fetch repos on mount
   useEffect(() => {
     fetchRepos();
+    fetchUser();
+
+    // Cleanup all EventSources on unmount
+    return () => {
+      Object.values(eventSourcesRef.current).forEach((es) => es.close());
+    };
   }, []);
+
+  // Track progress of syncing repos using SSE
+  useEffect(() => {
+    repos.forEach((repo) => {
+      if (!repo.is_ingested && !eventSourcesRef.current[repo.id]) {
+        try {
+          const es = new EventSource(`${BACKEND_URL}/repos/${repo.id}/progress`, {
+            withCredentials: true,
+          });
+
+          es.onmessage = (e) => {
+            try {
+              const data = JSON.parse(e.data);
+              const pct = data.progress ?? 0;
+              setRepoProgress((prev) => ({ ...prev, [repo.id]: pct }));
+
+              if (data.status === "completed") {
+                setRepos((prev) =>
+                  prev.map((r) => (r.id === repo.id ? { ...r, is_ingested: true } : r))
+                );
+                setActiveRepo((prev) =>
+                  prev && prev.id === repo.id ? { ...prev, is_ingested: true } : prev
+                );
+                es.close();
+                delete eventSourcesRef.current[repo.id];
+              } else if (data.status === "failed") {
+                es.close();
+                delete eventSourcesRef.current[repo.id];
+              }
+            } catch (err) {
+              console.error("Error parsing progress SSE event:", err);
+            }
+          };
+
+          es.onerror = () => {
+            es.close();
+            delete eventSourcesRef.current[repo.id];
+          };
+
+          eventSourcesRef.current[repo.id] = es;
+        } catch (err) {
+          console.error(`Failed to connect progress SSE for repo ${repo.id}:`, err);
+        }
+      }
+    });
+  }, [repos]);
+
+  const fetchUser = async () => {
+    try {
+      const res = await fetch(`${BACKEND_URL}/auth/me`, {
+        credentials: "include",
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setUser(data);
+      }
+    } catch (e) {
+      console.error("Failed to fetch user:", e);
+    }
+  };
+
+  const deleteRepo = async (repoId: number, repoName: string) => {
+    if (
+      !window.confirm(
+        `Are you sure you want to permanently remove "${repoName}"?\nThis will delete its webhooks, database record, and prune its Cognee knowledge graph memory.`
+      )
+    ) {
+      return;
+    }
+
+    try {
+      const res = await fetch(`${BACKEND_URL}/repos/${repoId}`, {
+        method: "DELETE",
+        credentials: "include",
+      });
+
+      if (res.ok) {
+        // Close event source if any
+        if (eventSourcesRef.current[repoId]) {
+          eventSourcesRef.current[repoId].close();
+          delete eventSourcesRef.current[repoId];
+        }
+
+        // Clean up progress state
+        setRepoProgress((prev) => {
+          const updated = { ...prev };
+          delete updated[repoId];
+          return updated;
+        });
+
+        setRepos((prev) => prev.filter((r) => r.id !== repoId));
+
+        if (activeRepo?.id === repoId) {
+          setActiveRepo(null);
+          setMessages([]);
+          setSources([]);
+        }
+      } else {
+        alert("Failed to delete repository from Copepod.");
+      }
+    } catch (e) {
+      console.error("Failed to delete repo:", e);
+      alert("Network error: Could not complete repository deletion.");
+    }
+  };
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -180,27 +303,113 @@ export default function StudioPage() {
         </form>
 
         <div className="studio-sidebar-list">
-          {repos.map((repo) => (
-            <div
-              key={repo.id}
-              className={`studio-repo-item ${activeRepo?.id === repo.id ? "active" : ""}`}
-              onClick={() => {
-                setActiveRepo(repo);
-                setMessages([]);
-                setSources([]);
-              }}
-            >
-              <span style={{ opacity: 0.5 }}>⊢</span>
-              <span style={{ flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                {repo.full_name}
-              </span>
-              {repo.is_ingested ? (
-                <span className="badge badge-green" style={{ fontSize: 9 }}>READY</span>
-              ) : (
-                <span className="badge badge-yellow" style={{ fontSize: 9 }}>SYNCING</span>
-              )}
-            </div>
-          ))}
+          {repos.map((repo) => {
+            const pct = repoProgress[repo.id] || 0;
+            const radius = 6;
+            const strokeWidth = 1.5;
+            const strokeDasharray = 2 * Math.PI * radius;
+            const strokeDashoffset = strokeDasharray - (strokeDasharray * pct) / 100;
+
+            return (
+              <div
+                key={repo.id}
+                className={`studio-repo-item ${activeRepo?.id === repo.id ? "active" : ""}`}
+                onClick={() => {
+                  setActiveRepo(repo);
+                  setMessages([]);
+                  setSources([]);
+                }}
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "space-between",
+                  padding: "0.5rem 0.75rem",
+                  cursor: "pointer",
+                }}
+              >
+                <div style={{ display: "flex", alignItems: "center", gap: 6, flex: 1, minWidth: 0 }}>
+                  <span style={{ opacity: 0.5 }}>⊢</span>
+                  <span
+                    style={{
+                      overflow: "hidden",
+                      textOverflow: "ellipsis",
+                      whiteSpace: "nowrap",
+                      fontSize: 12,
+                    }}
+                    title={repo.full_name}
+                  >
+                    {repo.full_name}
+                  </span>
+                </div>
+
+                <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
+                  {!repo.is_ingested ? (
+                    <div
+                      style={{ display: "flex", alignItems: "center", gap: 4 }}
+                      title={`Ingesting progress: ${pct}%`}
+                    >
+                      <svg width="14" height="14" style={{ transform: "rotate(-90deg)" }}>
+                        <circle
+                          cx="7"
+                          cy="7"
+                          r={radius}
+                          fill="transparent"
+                          stroke="var(--studio-border)"
+                          strokeWidth={strokeWidth}
+                        />
+                        <circle
+                          cx="7"
+                          cy="7"
+                          r={radius}
+                          fill="transparent"
+                          stroke="#eab308" /* yellow/amber */
+                          strokeWidth={strokeWidth}
+                          strokeDasharray={strokeDasharray}
+                          strokeDashoffset={strokeDashoffset}
+                          style={{ transition: "stroke-dashoffset 0.3s ease" }}
+                        />
+                      </svg>
+                      <span
+                        style={{
+                          fontSize: 9,
+                          color: "var(--studio-text-dim)",
+                          fontFamily: "var(--font-mono)",
+                        }}
+                      >
+                        {pct}%
+                      </span>
+                    </div>
+                  ) : (
+                    <span className="badge badge-green" style={{ fontSize: 9 }}>
+                      READY
+                    </span>
+                  )}
+
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      deleteRepo(repo.id, repo.full_name);
+                    }}
+                    style={{
+                      background: "none",
+                      border: "none",
+                      color: "var(--studio-text-dim)",
+                      cursor: "pointer",
+                      fontSize: 11,
+                      padding: "2px 4px",
+                      opacity: 0.6,
+                      transition: "opacity 0.2s",
+                    }}
+                    onMouseEnter={(e) => (e.currentTarget.style.opacity = "1")}
+                    onMouseLeave={(e) => (e.currentTarget.style.opacity = "0.6")}
+                    title="Remove Repository"
+                  >
+                    🗑️
+                  </button>
+                </div>
+              </div>
+            );
+          })}
 
           {repos.length === 0 && (
             <div
@@ -217,6 +426,109 @@ export default function StudioPage() {
             </div>
           )}
         </div>
+
+        {/* ── User Profile ────────────────────────────── */}
+        {user && (
+          <div
+            style={{
+              padding: "0.75rem",
+              borderTop: "1px solid var(--studio-border)",
+              marginTop: "auto",
+            }}
+          >
+            <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 8 }}>
+              {user.avatar_url && (
+                <img
+                  src={user.avatar_url}
+                  alt={user.github_login}
+                  style={{
+                    width: 28,
+                    height: 28,
+                    borderRadius: "50%",
+                    border: "1px solid var(--studio-border)",
+                  }}
+                />
+              )}
+              <div style={{ overflow: "hidden" }}>
+                <div
+                  style={{
+                    fontSize: 12,
+                    fontWeight: 600,
+                    color: "var(--studio-text)",
+                    overflow: "hidden",
+                    textOverflow: "ellipsis",
+                    whiteSpace: "nowrap",
+                  }}
+                >
+                  {user.github_name || user.github_login}
+                </div>
+                <div style={{ fontSize: 10, color: "var(--studio-text-dim)" }}>
+                  @{user.github_login}
+                </div>
+              </div>
+            </div>
+
+            {/* API Key section */}
+            {user.api_key && (
+              <div style={{ marginTop: 6 }}>
+                <div
+                  style={{
+                    fontSize: 10,
+                    color: "var(--studio-text-dim)",
+                    marginBottom: 3,
+                    textTransform: "uppercase",
+                    letterSpacing: "0.05em",
+                  }}
+                >
+                  API Key (for MCP / VS Code)
+                </div>
+                <div
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    gap: 4,
+                  }}
+                >
+                  <code
+                    style={{
+                      flex: 1,
+                      fontSize: 10,
+                      padding: "3px 6px",
+                      background: "var(--studio-bg)",
+                      border: "1px solid var(--studio-border)",
+                      borderRadius: 3,
+                      color: "var(--studio-text-dim)",
+                      overflow: "hidden",
+                      textOverflow: "ellipsis",
+                      whiteSpace: "nowrap",
+                      cursor: "pointer",
+                    }}
+                    onClick={() => {
+                      navigator.clipboard.writeText(user.api_key || "");
+                    }}
+                    title="Click to copy"
+                  >
+                    {showApiKey ? user.api_key : "•".repeat(20)}
+                  </code>
+                  <button
+                    onClick={() => setShowApiKey(!showApiKey)}
+                    style={{
+                      background: "none",
+                      border: "none",
+                      color: "var(--studio-text-dim)",
+                      cursor: "pointer",
+                      fontSize: 12,
+                      padding: 2,
+                    }}
+                    title={showApiKey ? "Hide" : "Show"}
+                  >
+                    {showApiKey ? "🙈" : "👁️"}
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
+        )}
       </aside>
 
       {/* ── Main Chat Area ─────────────────────────────────────── */}

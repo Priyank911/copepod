@@ -23,8 +23,8 @@ class Settings(BaseSettings):
     GITHUB_CLIENT_ID: str
     GITHUB_CLIENT_SECRET: str
 
-    # ── LLM / Groq ───────────────────────────────────────────────────
-    GROQ_API_KEY: str
+    # ── Google Gemini (AI Studio) ─────────────────────────────────────
+    GEMINI_API_KEY: str
 
     # ── Security ──────────────────────────────────────────────────────
     ENCRYPTION_KEY: str  # 32-byte hex string for AES-256
@@ -39,8 +39,7 @@ class Settings(BaseSettings):
     DATABASE_URL: str = "sqlite+aiosqlite:///./copepod.db"
 
     # ── Cognee ────────────────────────────────────────────────────────
-    COGNEE_LLM_PROVIDER: str = "groq"
-    COGNEE_LLM_MODEL: str = "groq/llama-3.3-70b-versatile"
+    COGNEE_LLM_MODEL: str = "gemini/gemini-3.5-flash"
     COGNEE_EMBEDDING_PROVIDER: str = "fastembed"
     COGNEE_EMBEDDING_MODEL: str = "BAAI/bge-small-en-v1.5"
     COGNEE_GRAPH_DB: str = "kuzu"
@@ -54,8 +53,14 @@ class Settings(BaseSettings):
 
     # ── Helpers ───────────────────────────────────────────────────────
     def dataset_name(self, user_id: int, owner: str, repo: str) -> str:
-        """Deterministic dataset key used to isolate Cognee data per repo."""
-        return f"copepod_{user_id}_{owner}_{repo}".lower().replace("-", "_")
+        """Deterministic dataset key used to isolate Cognee data per repo.
+
+        Cognee rejects dataset names containing dots or spaces,
+        so we sanitize by replacing all non-alphanumeric characters with underscores.
+        """
+        import re
+        raw = f"copepod_{user_id}_{owner}_{repo}".lower()
+        return re.sub(r"[^a-z0-9_]", "_", raw)
 
 
 @lru_cache

@@ -1,7 +1,7 @@
 """
 Chat and file context router — the query endpoints consumed by all three surfaces.
 
-POST /repos/{id}/chat       → recall from Cognee + format via Groq
+POST /repos/{id}/chat       → recall from Cognee + format via Gemini
 GET  /repos/{id}/file-context → file PR history with satisfaction scores
 GET  /repos/{id}/pr-history  → structured PR tree for VS Code
 """
@@ -11,7 +11,6 @@ from __future__ import annotations
 import logging
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
-from groq import Groq
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.config import get_settings
@@ -37,7 +36,7 @@ async def chat(
     Query the repository's institutional memory.
 
     1. Recall context from Cognee knowledge graph
-    2. Format the answer via Groq LLM with source citations
+    2. Format the answer via Gemini LLM with source citations
     3. Return structured response with PR/issue references
     """
     repo = await db.get(Repo, repo_id)
@@ -62,33 +61,37 @@ async def chat(
     # 2. Format context for LLM
     context = "\n\n".join(str(r) for r in raw_results[:10])
 
-    # 3. Generate answer via Groq
+    # 3. Generate answer via Gemini
     try:
-        client = Groq(api_key=settings.GROQ_API_KEY)
-        completion = client.chat.completions.create(
-            model="llama-3.3-70b-versatile",
-            messages=[
-                {
-                    "role": "system",
-                    "content": (
-                        "You are a code repository expert. Answer concisely using ONLY "
-                        "the context provided. Always cite PR numbers as [PR-123] and "
-                        "issue numbers as [#45]. If context is insufficient, say so. "
-                        "Focus on decision rationale and why things were done a certain way."
-                    ),
-                },
-                {
-                    "role": "user",
-                    "content": f"Context from repository '{repo.full_name}':\n{context}\n\nQuestion: {body.query}",
-                },
-            ],
-            temperature=0.3,
-            max_tokens=1024,
+        from google import genai
+
+        client = genai.Client(api_key=settings.GEMINI_API_KEY)
+
+        system_prompt = (
+            "You are a code repository expert. Answer concisely using ONLY "
+            "the context provided. Always cite PR numbers as [PR-123] and "
+            "issue numbers as [#45]. If context is insufficient, say so. "
+            "Focus on decision rationale and why things were done a certain way."
         )
-        answer = completion.choices[0].message.content or "Unable to generate answer."
+
+        user_prompt = f"Context from repository '{repo.full_name}':\n{context}\n\nQuestion: {body.query}"
+
+        response = client.models.generate_content(
+            model="gemini-3.5-flash",
+            contents=user_prompt,
+            config={
+                "system_instruction": system_prompt,
+                "temperature": 0.3,
+                "max_output_tokens": 1024,
+            },
+        )
+
+        answer = response.text or "Unable to generate answer."
+
     except Exception as e:
-        logger.exception("Groq API error")
-        answer = f"Context found but answer formatting failed: {context[:500]}"
+        logger.exception("Gemini API error: %s", e)
+        # Fallback: return raw context if LLM fails
+        answer = f"Context found but answer formatting failed. Here's what I found:\n\n{context[:1000]}"
 
     # 4. Extract source citations from raw results
     sources = _extract_sources(raw_results)
