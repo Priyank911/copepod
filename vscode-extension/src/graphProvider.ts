@@ -14,6 +14,7 @@
 
 import * as vscode from "vscode";
 import { CopepodApiClient } from "./apiClient";
+import { detectGitRepo } from "./gitDetector";
 
 export class CopepodGraphProvider implements vscode.WebviewViewProvider {
   private _view?: vscode.WebviewView;
@@ -43,6 +44,17 @@ export class CopepodGraphProvider implements vscode.WebviewViewProvider {
     }
 
     if (!this._apiClient.isConfigured()) {
+      const config = vscode.workspace.getConfiguration("copepod");
+      const apiKey = config.get<string>("apiKey", "");
+      const gitInfo = await detectGitRepo();
+      if (apiKey && gitInfo) {
+        this._view.webview.html = this._renderHtml("loading", null, null);
+        const resolved = await this._apiClient.resolveRepoId(gitInfo.fullName);
+        if (resolved) {
+          this.refresh();
+          return;
+        }
+      }
       this._view.webview.html = this._renderHtml("unconfigured", null, null);
       return;
     }
@@ -188,11 +200,11 @@ export class CopepodGraphProvider implements vscode.WebviewViewProvider {
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <style>${GRAPH_STYLES}</style>
+  <script>${GRAPH_SCRIPT}</script>
 </head>
 <body>
   ${this._renderHeader(filePath)}
   ${this._renderBody(state, graphData, errorMsg)}
-  <script>${GRAPH_SCRIPT}</script>
 </body>
 </html>`;
   }

@@ -56,7 +56,9 @@ export class CopepodRepoTreeProvider implements vscode.TreeDataProvider<RepoInfo
     const config = vscode.workspace.getConfiguration("copepod");
     const apiUrl = config.get<string>("apiUrl", "http://localhost:8000");
     const apiKey = config.get<string>("apiKey", "");
-    const repoId = config.get<string>("repoId", "");
+    const configuredRepoId = config.get<string>("repoId", "");
+    const autoDetect = config.get<boolean>("autoDetectRepo", true);
+    const repoId = configuredRepoId || (autoDetect && this.gitInfo ? this.gitInfo.fullName : "");
 
     if (apiKey && repoId) {
       items.push(new RepoInfoItem(

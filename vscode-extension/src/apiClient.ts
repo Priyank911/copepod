@@ -35,18 +35,60 @@ export interface ChatResponse {
 }
 
 export class CopepodApiClient {
+  private detectedRepoId?: string;
+  private resolvedRepoDbId?: number;
+
+  setDetectedRepoId(repoId: string) {
+    this.detectedRepoId = repoId;
+  }
+
+  async resolveRepoId(fullName: string): Promise<boolean> {
+    if (this.resolvedRepoDbId) { return true; }
+    const { apiUrl, apiKey } = this.getConfig();
+    if (!apiKey) { return false; }
+
+    const url = `${apiUrl}/repos`;
+    try {
+      const repos = await this.httpGet<any[]>(url, apiKey);
+      if (repos && Array.isArray(repos)) {
+        const match = repos.find(r => r.full_name.toLowerCase() === fullName.toLowerCase());
+        if (match) {
+          this.resolvedRepoDbId = match.id;
+          console.log(`Resolved repo ${fullName} to DB ID ${match.id}`);
+          return true;
+        }
+      }
+    } catch (err) {
+      console.error("Failed to resolve repo ID:", err);
+    }
+    return false;
+  }
+
   private getConfig() {
     const config = vscode.workspace.getConfiguration("copepod");
+    const configuredRepoId = config.get<string>("repoId", "");
+    const autoDetect = config.get<boolean>("autoDetectRepo", true);
+    
+    let resolvedId = configuredRepoId;
+    if (!resolvedId && autoDetect) {
+      if (this.resolvedRepoDbId) {
+        resolvedId = String(this.resolvedRepoDbId);
+      } else {
+        resolvedId = this.detectedRepoId || "";
+      }
+    }
+
     return {
       apiUrl: config.get<string>("apiUrl", "http://localhost:8000"),
       apiKey: config.get<string>("apiKey", ""),
-      repoId: config.get<string>("repoId", ""),
+      repoId: resolvedId,
     };
   }
 
   isConfigured(): boolean {
     const { apiKey, repoId } = this.getConfig();
-    return apiKey.length > 0 && repoId.length > 0;
+    // Must have apiKey and a valid integer repoId (either configured or resolved)
+    return apiKey.length > 0 && repoId.length > 0 && /^\d+$/.test(repoId);
   }
 
   async getFileContext(filePath: string): Promise<FileContextResponse | null> {
@@ -82,7 +124,7 @@ export class CopepodApiClient {
         url,
         {
           headers: { "X-API-Key": apiKey, "Accept": "application/json" },
-          timeout: 20000,
+          timeout: 60000,
         },
         (res) => {
           let body = "";

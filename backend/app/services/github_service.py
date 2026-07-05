@@ -100,7 +100,7 @@ def fetch_closed_issues(token: str, full_name: str, limit: int = 100) -> list[di
 def fetch_source_files(
     token: str, full_name: str,
     extensions: tuple[str, ...] = (".py", ".js", ".ts", ".go"),
-    max_files: int = 50,
+    max_files: int = 200,
 ) -> list[dict[str, str]]:
     """Fetch source code files from the repository."""
     g = _get_client(token)

@@ -29,6 +29,14 @@ export async function activate(context: vscode.ExtensionContext) {
   const gitInfo = await detectGitRepo();
   if (gitInfo) {
     console.log(`🦐 Detected repo: ${gitInfo.fullName} (remote: ${gitInfo.remote})`);
+    apiClient.setDetectedRepoId(gitInfo.fullName);
+    
+    // Resolve repo ID asynchronously and refresh tree view
+    apiClient.resolveRepoId(gitInfo.fullName).then((success) => {
+      if (success) {
+        vscode.commands.executeCommand("copepod.refresh");
+      }
+    });
   }
 
   // Register Graph WebView

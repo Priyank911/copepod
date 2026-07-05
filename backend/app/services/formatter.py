@@ -28,7 +28,6 @@ def format_pr(
 ) -> str:
     """Convert a merged PR into a structured sentence for Cognee ingestion."""
     linked = _extract_linked_issues(body or "")
-    file_list = ", ".join(files[:8]) if files else "unknown files"
     
     clean_body = (body or "").strip()
     if not clean_body or len(clean_body) < 30:
@@ -47,14 +46,17 @@ def format_pr(
     if reviews:
         review_text = f" Review feedback: {_summarize_reviews(reviews)}."
 
-    return (
+    main_sentence = (
         f"Pull Request #{number} titled '{title}' was merged on {date_str} "
         f"by {author}. "
-        f"Files modified: {file_list}. "
         f"Decision rationale: {rationale}. "
         f"Resolves issues: {', '.join(linked) or 'none'}."
         f"{review_text}"
     )
+
+    file_sentences = [f"Pull Request #{number} modified the file '{f}'." for f in files[:100]]
+
+    return main_sentence + " " + " ".join(file_sentences)
 
 
 def format_issue(
@@ -109,8 +111,10 @@ def format_function(
     call_list = ", ".join(calls[:5]) if calls else "none"
 
     return (
-        f"{prefix} {name} in {file_path} at line {lineno}: "
-        f"{doc}. Calls: {call_list}."
+        f"File '{file_path}' contains function '{name}'. "
+        f"{prefix} '{name}' is defined in file '{file_path}' at line {lineno}. "
+        f"{prefix} '{name}' calls: {call_list}. "
+        f"{prefix} '{name}' description: {doc}."
     )
 
 
@@ -127,8 +131,11 @@ def format_class(
     base_list = ", ".join(bases) if bases else "object"
 
     return (
-        f"Class {name} in {file_path} inherits from {base_list}. "
-        f"Methods: {method_list}. Purpose: {doc}."
+        f"File '{file_path}' contains class '{name}'. "
+        f"Class '{name}' is defined in file '{file_path}'. "
+        f"Class '{name}' inherits from {base_list}. "
+        f"Class '{name}' has methods: {method_list}. "
+        f"Class '{name}' purpose: {doc}."
     )
 
 

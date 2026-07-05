@@ -25,9 +25,40 @@ router = APIRouter(prefix="/repos", tags=["chat"])
 settings = get_settings()
 
 
+from sqlalchemy import select
+
+async def _get_repo(db: AsyncSession, repo_id_or_name: str, user_id: int) -> Repo | None:
+    """Resolve repository by database ID or owner/name string."""
+    logger.info("Resolving repo: repo_id_or_name=%s, user_id=%s", repo_id_or_name, user_id)
+    try:
+        if repo_id_or_name.isdigit():
+            repo = await db.get(Repo, int(repo_id_or_name))
+            if repo and repo.user_id == user_id:
+                logger.info("Resolved repo by ID: %s", repo.full_name)
+                return repo
+            logger.info("Repo not found by ID: %s", repo_id_or_name)
+            return None
+
+        # Resolve by full name (string)
+        stmt = select(Repo).where(
+            Repo.user_id == user_id,
+            Repo.full_name == repo_id_or_name.strip("/")
+        )
+        result = await db.execute(stmt)
+        repo = result.scalar_one_or_none()
+        if repo:
+            logger.info("Resolved repo by name: %s", repo.full_name)
+        else:
+            logger.info("Repo not found by name: %s", repo_id_or_name)
+        return repo
+    except Exception as e:
+        logger.exception("Error in _get_repo: %s", e)
+        return None
+
+
 @router.post("/{repo_id}/chat", response_model=ChatResponse)
 async def chat(
-    repo_id: int,
+    repo_id: str,
     body: ChatRequest,
     user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
@@ -39,8 +70,8 @@ async def chat(
     2. Format the answer via Gemini LLM with source citations
     3. Return structured response with PR/issue references
     """
-    repo = await db.get(Repo, repo_id)
-    if not repo or repo.user_id != user.id:
+    repo = await _get_repo(db, repo_id, user.id)
+    if not repo:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "Repo not found")
 
     if not repo.is_ingested:
@@ -179,7 +210,7 @@ async def chat(
 
 @router.get("/{repo_id}/chat/history", response_model=list[ChatMessageOut])
 async def get_chat_history(
-    repo_id: int,
+    repo_id: str,
     user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
@@ -187,15 +218,13 @@ async def get_chat_history(
     Get chat history for a specific repository.
     Fetches the last 100 messages for the current user and repository.
     """
-    from sqlalchemy import select
-
-    repo = await db.get(Repo, repo_id)
-    if not repo or repo.user_id != user.id:
+    repo = await _get_repo(db, repo_id, user.id)
+    if not repo:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "Repo not found")
 
     stmt = (
         select(ChatMessage)
-        .where(ChatMessage.user_id == user.id, ChatMessage.repo_id == repo_id)
+        .where(ChatMessage.user_id == user.id, ChatMessage.repo_id == repo.id)
         .order_by(ChatMessage.created_at.desc())
         .limit(100)
     )
@@ -207,7 +236,7 @@ async def get_chat_history(
 
 @router.delete("/{repo_id}/chat/history")
 async def clear_chat_history(
-    repo_id: int,
+    repo_id: str,
     user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
@@ -216,13 +245,13 @@ async def clear_chat_history(
     """
     from sqlalchemy import delete
 
-    repo = await db.get(Repo, repo_id)
-    if not repo or repo.user_id != user.id:
+    repo = await _get_repo(db, repo_id, user.id)
+    if not repo:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "Repo not found")
 
     stmt = delete(ChatMessage).where(
         ChatMessage.user_id == user.id,
-        ChatMessage.repo_id == repo_id,
+        ChatMessage.repo_id == repo.id,
     )
     await db.execute(stmt)
     await db.commit()
@@ -232,7 +261,7 @@ async def clear_chat_history(
 
 @router.get("/{repo_id}/file-context")
 async def file_context(
-    repo_id: int,
+    repo_id: str,
     path: str = Query(..., description="Repo-relative file path"),
     user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
@@ -243,8 +272,8 @@ async def file_context(
     Used by MCP file_context tool and VS Code sidebar.
     Returns PR history with satisfaction scores.
     """
-    repo = await db.get(Repo, repo_id)
-    if not repo or repo.user_id != user.id:
+    repo = await _get_repo(db, repo_id, user.id)
+    if not repo:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "Repo not found")
 
     # Recall file-specific context from Cognee
@@ -267,7 +296,7 @@ async def file_context(
 
 @router.get("/{repo_id}/pr-history")
 async def pr_history(
-    repo_id: int,
+    repo_id: str,
     path: str = Query(..., description="Repo-relative file path"),
     user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
@@ -278,8 +307,8 @@ async def pr_history(
     Returns PRs that touched the specified file, with satisfaction scores
     and linked issues — used by the VS Code webview to render the SVG tree.
     """
-    repo = await db.get(Repo, repo_id)
-    if not repo or repo.user_id != user.id:
+    repo = await _get_repo(db, repo_id, user.id)
+    if not repo:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "Repo not found")
 
     query = f"List all pull requests that modified {path}, their rationale, and linked issues."

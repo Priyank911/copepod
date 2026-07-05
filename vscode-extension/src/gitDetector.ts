@@ -95,14 +95,19 @@ function extractFullName(remoteUrl: string): string | null {
   // git@github.com:owner/repo.git
   // https://github.com/owner/repo
 
+  let url = remoteUrl.trim();
+  if (url.endsWith(".git")) {
+    url = url.slice(0, -4);
+  }
+
   // HTTPS format
-  const httpsMatch = remoteUrl.match(/github\.com[/:]([^/]+)\/([^/.]+)/);
+  const httpsMatch = url.match(/github\.com[/:]([^/]+)\/([^/]+)/);
   if (httpsMatch) {
     return `${httpsMatch[1]}/${httpsMatch[2]}`;
   }
 
   // SSH format
-  const sshMatch = remoteUrl.match(/git@github\.com:([^/]+)\/([^/.]+)/);
+  const sshMatch = url.match(/git@github\.com:([^/]+)\/([^/]+)/);
   if (sshMatch) {
     return `${sshMatch[1]}/${sshMatch[2]}`;
   }

@@ -185,6 +185,7 @@ async def recall(query: str, dataset_name: str) -> list[Any]:
         results = await cognee.recall(
             query_text=query,
             datasets=[dataset_name],
+            auto_route=False,
         )
         logger.info("Recall returned %d results from '%s'", len(results) if results else 0, dataset_name)
         return results or []
