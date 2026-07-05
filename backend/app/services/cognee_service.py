@@ -47,12 +47,26 @@ def setup_cognee_env() -> None:
     from app.config import get_settings
     s = get_settings()
 
-    # Configure root directories in user home folder to avoid Program Files/site-packages permission issues
-    cognee.config.system_root_directory = os.path.expanduser("~/.cognee")
-    cognee.config.data_root_directory = os.path.expanduser("~/.cognee")
+    # Configure root directories: use /app/.cognee inside Docker container if writeable, otherwise fallback to home folder
+    cognee_dir = "/app/.cognee"
+    if not os.path.exists(cognee_dir) or not os.access(cognee_dir, os.W_OK):
+        cognee_dir = os.path.expanduser("~/.cognee")
+
+    cognee.config.system_root_directory = cognee_dir
+    cognee.config.data_root_directory = cognee_dir
+
+    # Force database paths to use this directory and clear Pydantic config cache
+    db_path = os.path.join(cognee_dir, "databases")
+    os.makedirs(db_path, exist_ok=True)
+    os.environ["DB_PATH"] = db_path
+    try:
+        from cognee.infrastructure.databases.relational.config import get_relational_config
+        get_relational_config.cache_clear()
+    except Exception:
+        pass
 
     # Bypass LanceDB disk spilling on Windows and configure datafusion to use a safe local temp folder without compression
-    temp_dir = os.path.expanduser("~/.cognee/temp")
+    temp_dir = os.path.join(cognee_dir, "temp")
     os.makedirs(temp_dir, exist_ok=True)
     os.environ["DATAFUSION_RUNTIME_TEMP_DIR"] = temp_dir
     os.environ["DATAFUSION_EXECUTION_SPILL_COMPRESSION"] = "uncompressed"
@@ -78,8 +92,11 @@ def setup_cognee_env() -> None:
     cognee.config.set_vector_db_provider(s.COGNEE_VECTOR_DB)
     cognee.config.set_vector_db_subprocess_enabled(False)
 
-    # Disable multi-tenant auth inside Cognee (we handle auth ourselves)
-    os.environ.setdefault("ENABLE_BACKEND_ACCESS_CONTROL", "false")
+    # Disable Cognee access control (we route databases to isolated paths ourselves)
+    os.environ["ENABLE_BACKEND_ACCESS_CONTROL"] = "false"
+
+    # Disable LiteLLM caching to prevent stale answers from other repositories from bleeding in
+    os.environ["CACHING"] = "false"
 
     # Skip Cognee's 30s LLM connection test at startup — it can timeout
     # on some providers and block the entire startup sequence.
@@ -89,6 +106,32 @@ def setup_cognee_env() -> None:
         "Cognee configured: LLM=gemini(%s), Embedding=%s, Graph=%s, Vector=%s",
         s.COGNEE_LLM_MODEL, s.COGNEE_EMBEDDING_MODEL,
         s.COGNEE_GRAPH_DB, s.COGNEE_VECTOR_DB,
+    )
+
+
+def configure_isolated_dataset(dataset_name: str) -> None:
+    """
+    Dynamically route Cognee Kuzu and LanceDB paths to isolated directories for dataset_name.
+    """
+    from cognee.infrastructure.databases.graph.config import get_graph_config
+    from cognee.infrastructure.databases.vector.config import get_vectordb_config
+
+    db_base = "/app/.cognee/databases"
+    
+    # Isolated parent paths
+    os.makedirs(os.path.join(db_base, "isolated_graphs"), exist_ok=True)
+    os.makedirs(os.path.join(db_base, "isolated_vectors"), exist_ok=True)
+
+    graph_file = os.path.join(db_base, "isolated_graphs", f"{dataset_name}.db")
+    vector_path = os.path.join(db_base, "isolated_vectors", dataset_name)
+    
+    # Mutate the global singleton configurations
+    get_graph_config().graph_file_path = graph_file
+    get_vectordb_config().vector_db_url = vector_path
+    
+    logger.info(
+        "Routed Cognee to isolated dataset '%s': Graph='%s', Vector='%s'",
+        dataset_name, graph_file, vector_path
     )
 
 
@@ -105,6 +148,8 @@ async def remember(sentences: list[str], dataset_name: str) -> None:
     if not sentences:
         logger.warning("No sentences to remember for dataset %s", dataset_name)
         return
+
+    configure_isolated_dataset(dataset_name)
 
     text_block = "\n\n".join(sentences)
     logger.info(
@@ -132,6 +177,8 @@ async def recall(query: str, dataset_name: str) -> list[Any]:
     """
     import cognee
 
+    configure_isolated_dataset(dataset_name)
+
     logger.info("Recalling from '%s': %s", dataset_name, query[:100])
 
     try:
@@ -141,8 +188,12 @@ async def recall(query: str, dataset_name: str) -> list[Any]:
         )
         logger.info("Recall returned %d results from '%s'", len(results) if results else 0, dataset_name)
         return results or []
-    except Exception:
-        logger.exception("Failed to recall from '%s'", dataset_name)
+    except Exception as e:
+        err_msg = str(e)
+        if "DatasetNotFoundError" in err_msg or "No datasets found" in err_msg:
+            logger.warning("Dataset '%s' not found in Cognee. Re-ingestion may be required.", dataset_name)
+        else:
+            logger.exception("Failed to recall from '%s'", dataset_name)
         return []
 
 
@@ -155,6 +206,8 @@ async def improve(dataset_name: str) -> None:
     was used and produced a successful outcome.
     """
     import cognee
+
+    configure_isolated_dataset(dataset_name)
 
     logger.info("Improving dataset '%s'", dataset_name)
 
@@ -174,6 +227,8 @@ async def forget_dataset(dataset_name: str) -> None:
     - A repo needs to be re-ingested from scratch
     """
     import cognee
+
+    configure_isolated_dataset(dataset_name)
 
     logger.info("Forgetting dataset '%s'", dataset_name)
 

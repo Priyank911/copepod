@@ -15,6 +15,7 @@ from sqlalchemy import (
     Integer,
     String,
     Text,
+    JSON,
 )
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
@@ -57,6 +58,9 @@ class User(Base):
     )
 
     repos: Mapped[list["Repo"]] = relationship(back_populates="owner", cascade="all, delete-orphan")
+    chat_messages: Mapped[list["ChatMessage"]] = relationship(
+        back_populates="user", cascade="all, delete-orphan"
+    )
 
 
 # ── Repo ──────────────────────────────────────────────────────────────
@@ -82,6 +86,9 @@ class Repo(Base):
     ingestion_jobs: Mapped[list["IngestionJob"]] = relationship(
         back_populates="repo", cascade="all, delete-orphan"
     )
+    chat_messages: Mapped[list["ChatMessage"]] = relationship(
+        back_populates="repo", cascade="all, delete-orphan"
+    )
 
 
 # ── Ingestion Job ────────────────────────────────────────────────────
@@ -103,3 +110,21 @@ class IngestionJob(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_utcnow)
 
     repo: Mapped["Repo"] = relationship(back_populates="ingestion_jobs")
+
+
+# ── Chat Message ──────────────────────────────────────────────────────
+
+class ChatMessage(Base):
+    __tablename__ = "chat_messages"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    user_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
+    repo_id: Mapped[int] = mapped_column(ForeignKey("repos.id", ondelete="CASCADE"), nullable=False, index=True)
+    role: Mapped[str] = mapped_column(String(50), nullable=False)
+    content: Mapped[str] = mapped_column(Text, nullable=False)
+    sources: Mapped[list | None] = mapped_column(JSON, nullable=True)
+    reasoning_steps: Mapped[list | None] = mapped_column(JSON, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_utcnow)
+
+    user: Mapped["User"] = relationship(back_populates="chat_messages")
+    repo: Mapped["Repo"] = relationship(back_populates="chat_messages")

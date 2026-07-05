@@ -10,7 +10,6 @@ Handles:
 from __future__ import annotations
 
 import logging
-from datetime import datetime
 from typing import Any
 
 from github import Github, Auth, GithubException
@@ -89,7 +88,7 @@ def fetch_closed_issues(token: str, full_name: str, limit: int = 100) -> list[di
             "title": issue.title,
             "body": issue.body,
             "author": issue.user.login if issue.user else "unknown",
-            "labels": [l.name for l in issue.labels],
+            "labels": [lbl.name for lbl in issue.labels],
             "closed_at": issue.closed_at,
         })
 
@@ -209,3 +208,36 @@ def post_issue_comment(token: str, full_name: str, issue_number: int, body: str)
         logger.error("Failed to post comment on %s#%d: %s", full_name, issue_number, e)
         g.close()
         return False
+
+
+def fetch_pr_patches(
+    token: str,
+    full_name: str,
+    pr_number: int,
+    max_files: int = 5,
+    extensions: tuple[str, ...] = (".py", ".js", ".ts", ".go", ".rs", ".cpp", ".h", ".cs", ".java"),
+) -> list[dict[str, str]]:
+    """Fetch diff patches for code files in a PR to minimize LLM token bloat."""
+    g = _get_client(token)
+    patches = []
+    try:
+        repo = g.get_repo(full_name)
+        pr = repo.get_pull(pr_number)
+        
+        file_count = 0
+        for f in pr.get_files():
+            if file_count >= max_files:
+                break
+            
+            # Only include files matching extensions and having valid patches
+            if any(f.filename.endswith(ext) for ext in extensions) and f.patch:
+                patches.append({
+                    "filename": f.filename,
+                    "patch": f.patch,
+                })
+                file_count += 1
+    except Exception as e:
+        logger.error("Failed to fetch PR patches for %s#%d: %s", full_name, pr_number, e)
+    finally:
+        g.close()
+    return patches

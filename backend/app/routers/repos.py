@@ -13,7 +13,6 @@ from __future__ import annotations
 
 import asyncio
 import logging
-from typing import Annotated
 
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, status
 from sqlalchemy import select

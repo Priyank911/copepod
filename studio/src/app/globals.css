@@ -495,3 +495,55 @@ body {
 ::-webkit-scrollbar-thumb:hover {
   background: var(--cpd-text-tertiary);
 }
+
+/* ── Markdown Content Styling ───────────────────────────────────── */
+.markdown-content {
+  line-height: 1.6;
+  font-size: 13px;
+  color: var(--studio-text);
+}
+
+.markdown-content p {
+  margin-bottom: 0.75rem;
+}
+
+.markdown-content ul, .markdown-content ol {
+  margin-bottom: 0.75rem;
+  padding-left: 1.25rem;
+}
+
+.markdown-content li {
+  margin-bottom: 0.25rem;
+  list-style-type: disc;
+}
+
+.markdown-content strong {
+  font-weight: 700;
+}
+
+.markdown-content code {
+  background: var(--studio-surface);
+  color: var(--studio-accent);
+  padding: 2px 4px;
+  border-radius: 4px;
+  font-family: var(--font-mono);
+  font-size: 11px;
+}
+
+.markdown-content pre {
+  background: var(--studio-surface);
+  border: 1px solid var(--studio-border);
+  border-radius: 6px;
+  padding: 0.75rem;
+  overflow-x: auto;
+  margin-top: 0.75rem;
+  margin-bottom: 0.75rem;
+}
+
+.markdown-content pre code {
+  background: transparent;
+  color: inherit;
+  padding: 0;
+  border-radius: 0;
+  font-size: 12px;
+}
