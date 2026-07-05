@@ -18,8 +18,8 @@ from datetime import datetime, timezone
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.models.models import IngestionJob, IngestionStatus, IngestionKind, Repo
-from app.services import formatter, code_parser, cognee_service, github_service
+from app.models.models import IngestionJob, IngestionStatus, IngestionKind, Repo, User
+from app.services import formatter, code_parser, cognee_service, github_service, diff_analyzer
 from app.utils.crypto import decrypt_token
 
 logger = logging.getLogger(__name__)
@@ -81,7 +81,22 @@ async def run_full_ingest(
         prs = await asyncio.to_thread(
             github_service.fetch_merged_prs, token, repo.full_name, limit=100
         )
-        for pr in prs:
+        for idx, pr in enumerate(prs):
+            diff_analysis = None
+            clean_body = (pr["body"] or "").strip()
+            is_recent = idx < 5
+            is_low_quality = not clean_body or len(clean_body) < 30
+            
+            # Fetch and analyze patches only if recent or human rationale is poor/missing
+            if is_recent or is_low_quality:
+                patches = await asyncio.to_thread(
+                    github_service.fetch_pr_patches, token, repo.full_name, pr["number"]
+                )
+                if patches:
+                    diff_analysis = await asyncio.to_thread(
+                        diff_analyzer.analyze_pr_diff, pr["number"], pr["title"], patches
+                    )
+            
             all_sentences.append(formatter.format_pr(
                 number=pr["number"],
                 title=pr["title"],
@@ -90,6 +105,7 @@ async def run_full_ingest(
                 merged_at=pr["merged_at"],
                 files=pr["files"],
                 reviews=pr.get("reviews"),
+                diff_analysis=diff_analysis,
             ))
 
         await _update_progress(db, job, 30, f"Processed {len(prs)} PRs. Fetching issues...")
@@ -191,6 +207,21 @@ async def delta_ingest_pr(
 
     try:
         pr = pr_data["pull_request"]
+        
+        # Resolve token and analyze diff
+        user = await db.get(User, repo.user_id)
+        token = decrypt_token(user.encrypted_token) if user else None
+        
+        diff_analysis = None
+        if token:
+            patches = await asyncio.to_thread(
+                github_service.fetch_pr_patches, token, repo.full_name, pr["number"]
+            )
+            if patches:
+                diff_analysis = await asyncio.to_thread(
+                    diff_analyzer.analyze_pr_diff, pr["number"], pr["title"], patches
+                )
+
         sentences = [formatter.format_pr(
             number=pr["number"],
             title=pr["title"],
@@ -198,6 +229,7 @@ async def delta_ingest_pr(
             author=pr["user"]["login"],
             merged_at=datetime.fromisoformat(pr["merged_at"].replace("Z", "+00:00")) if pr.get("merged_at") else None,
             files=[f["filename"] for f in pr.get("files", [])],
+            diff_analysis=diff_analysis,
         )]
 
         await cognee_service.remember(sentences, repo.dataset_name)
@@ -233,7 +265,7 @@ async def delta_ingest_issue(
             number=issue["number"],
             title=issue["title"],
             body=issue.get("body"),
-            labels=[l["name"] for l in issue.get("labels", [])],
+            labels=[lbl["name"] for lbl in issue.get("labels", [])],
             closed_at=closed_at,
             author=issue["user"]["login"],
         )]
@@ -241,5 +273,5 @@ async def delta_ingest_issue(
         await cognee_service.remember(sentences, repo.dataset_name)
         logger.info("Delta ingested issue #%d for %s", issue["number"], repo.full_name)
 
-    except Exception as e:
+    except Exception:
         logger.exception("Delta ingest failed for issue in %s", repo.full_name)

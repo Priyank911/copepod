@@ -1,3 +1,4 @@
+# ruff: noqa: E402
 from __future__ import annotations
 
 import os
@@ -18,6 +19,21 @@ if sys.platform == "win32":
             continue
         clean_parts.append(part)
     os.environ["PATH"] = os.pathsep.join(clean_parts)
+
+# Configure Cognee root paths globally before any other imports are loaded.
+# This prevents cached configurations (like relational, vector, and graph DB providers)
+# from defaulting to the package installation folder inside site-packages.
+cognee_dir = "/app/.cognee"
+if not os.path.exists(cognee_dir) or not os.access(cognee_dir, os.W_OK):
+    cognee_dir = os.path.expanduser("~/.cognee")
+
+os.environ["SYSTEM_ROOT_DIRECTORY"] = cognee_dir
+os.environ["DATA_ROOT_DIRECTORY"] = cognee_dir
+os.environ["DB_PATH"] = os.path.join(cognee_dir, "databases")
+os.environ["ENABLE_BACKEND_ACCESS_CONTROL"] = "false"
+os.environ["CACHING"] = "false"
+os.makedirs(os.environ["DB_PATH"], exist_ok=True)
+os.makedirs(os.path.join(cognee_dir, "temp"), exist_ok=True)
 
 import logging
 from contextlib import asynccontextmanager

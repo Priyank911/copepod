@@ -72,6 +72,7 @@ class SourceCitation(BaseModel):
     title: str
     url: str | None = None
     relevance: float = Field(default=1.0, ge=0, le=1)
+    context_snippet: str | None = None
 
 
 class ChatResponse(BaseModel):
@@ -79,6 +80,19 @@ class ChatResponse(BaseModel):
     sources: list[SourceCitation] = []
     dataset: str
     query: str
+    reasoning_steps: list[str] = []
+    raw_contexts: list[str] = []
+
+
+class ChatMessageOut(BaseModel):
+    id: int
+    role: str
+    content: str
+    sources: list[SourceCitation] | None = None
+    reasoning_steps: list[str] | None = None
+    created_at: datetime
+
+    model_config = {"from_attributes": True}
 
 
 # ── File Context ──────────────────────────────────────────────────────

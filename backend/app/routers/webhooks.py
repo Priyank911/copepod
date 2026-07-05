@@ -15,7 +15,6 @@ from __future__ import annotations
 import hashlib
 import hmac
 import logging
-from typing import Any
 
 from fastapi import APIRouter, BackgroundTasks, Header, HTTPException, Request, status
 from sqlalchemy import select

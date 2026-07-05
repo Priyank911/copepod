@@ -9,22 +9,11 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     && rm -rf /var/lib/apt/lists/*
 
 # Install Python dependencies
+COPY requirements.txt .
+RUN pip install --no-cache-dir -r requirements.txt
+
 COPY pyproject.toml .
-RUN pip install --no-cache-dir -e . 2>/dev/null || pip install --no-cache-dir \
-    "fastapi>=0.115.0" \
-    "uvicorn[standard]>=0.30.0" \
-    "sqlalchemy[asyncio]>=2.0.0" \
-    "aiosqlite>=0.20.0" \
-    "cognee[fastembed]>=0.1.0" \
-    "fastembed>=0.3.0" \
-    "PyGithub>=2.3.0" \
-    "httpx>=0.27.0" \
-    "python-jose[cryptography]>=3.3.0" \
-    "cryptography>=42.0.0" \
-    "pydantic-settings>=2.3.0" \
-    "sse-starlette>=2.0.0" \
-    "google-genai>=1.0.0" \
-    "python-multipart>=0.0.9"
+RUN pip install --no-cache-dir --no-deps -e .
 
 # Copy application code
 COPY app/ app/

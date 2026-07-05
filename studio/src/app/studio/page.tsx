@@ -14,6 +14,7 @@
  */
 
 import { useState, useRef, useEffect, FormEvent } from "react";
+import { marked } from "marked";
 
 const BACKEND_URL = process.env.NEXT_PUBLIC_BACKEND_URL || "http://localhost:8000";
 
@@ -37,12 +38,14 @@ interface Source {
   title: string;
   url?: string;
   relevance: number;
+  context_snippet?: string;
 }
 
 interface Message {
   role: "user" | "assistant";
   content: string;
   sources?: Source[];
+  reasoning_steps?: string[];
 }
 
 export default function StudioPage() {
@@ -52,6 +55,7 @@ export default function StudioPage() {
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
   const [sources, setSources] = useState<Source[]>([]);
+  const [selectedSource, setSelectedSource] = useState<Source | null>(null);
   const [addRepoInput, setAddRepoInput] = useState("");
   const [addingRepo, setAddingRepo] = useState(false);
   const [user, setUser] = useState<UserProfile | null>(null);
@@ -180,6 +184,73 @@ export default function StudioPage() {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages]);
 
+  // Fetch history when active repo changes
+  useEffect(() => {
+    if (activeRepo) {
+      fetchChatHistory(activeRepo.id);
+    } else {
+      setMessages([]);
+      setSources([]);
+      setSelectedSource(null);
+    }
+  }, [activeRepo]);
+
+  const fetchChatHistory = async (repoId: number) => {
+    try {
+      const res = await fetch(`${BACKEND_URL}/repos/${repoId}/chat/history`, {
+        credentials: "include",
+      });
+      if (res.ok) {
+        const data = await res.json();
+        const mappedMessages: Message[] = data.map((msg: any) => ({
+          role: msg.role,
+          content: msg.content,
+          sources: msg.sources || [],
+          reasoning_steps: msg.reasoning_steps || [],
+        }));
+        setMessages(mappedMessages);
+        const botMessages = mappedMessages.filter((m) => m.role === "assistant");
+        if (botMessages.length > 0) {
+          const lastBotMsg = botMessages[botMessages.length - 1];
+          setSources(lastBotMsg.sources || []);
+          if (lastBotMsg.sources && lastBotMsg.sources.length > 0) {
+            setSelectedSource(lastBotMsg.sources[0]);
+          } else {
+            setSelectedSource(null);
+          }
+        } else {
+          setSources([]);
+          setSelectedSource(null);
+        }
+      }
+    } catch (e) {
+      console.error("Failed to fetch chat history:", e);
+    }
+  };
+
+  const clearChatHistory = async () => {
+    if (!activeRepo) return;
+    if (!window.confirm("Are you sure you want to clear your chat history for this repository?")) {
+      return;
+    }
+    try {
+      const res = await fetch(`${BACKEND_URL}/repos/${activeRepo.id}/chat/history`, {
+        method: "DELETE",
+        credentials: "include",
+      });
+      if (res.ok) {
+        setMessages([]);
+        setSources([]);
+        setSelectedSource(null);
+      } else {
+        alert("Failed to clear chat history.");
+      }
+    } catch (e) {
+      console.error("Failed to clear chat history:", e);
+      alert("Network error: Could not clear chat history.");
+    }
+  };
+
   const fetchRepos = async () => {
     try {
       const res = await fetch(`${BACKEND_URL}/repos`, {
@@ -244,10 +315,12 @@ export default function StudioPage() {
           role: "assistant",
           content: data.answer,
           sources: data.sources,
+          reasoning_steps: data.reasoning_steps,
         };
         setMessages((prev) => [...prev, botMsg]);
         if (data.sources?.length > 0) {
           setSources(data.sources);
+          setSelectedSource(data.sources[0]);
         }
       } else {
         setMessages((prev) => [
@@ -557,6 +630,32 @@ export default function StudioPage() {
                 "Select a repository"
               )}
             </span>
+            {activeRepo && messages.length > 0 && (
+              <button
+                onClick={clearChatHistory}
+                style={{
+                  background: "transparent",
+                  border: "1px solid var(--studio-border)",
+                  borderRadius: 4,
+                  padding: "4px 8px",
+                  color: "var(--studio-text-dim)",
+                  fontSize: 11,
+                  fontFamily: "var(--font-mono)",
+                  cursor: "pointer",
+                  transition: "all 120ms ease",
+                }}
+                onMouseEnter={(e) => {
+                  (e.target as HTMLButtonElement).style.borderColor = "var(--studio-accent)";
+                  (e.target as HTMLButtonElement).style.color = "var(--studio-text)";
+                }}
+                onMouseLeave={(e) => {
+                  (e.target as HTMLButtonElement).style.borderColor = "var(--studio-border)";
+                  (e.target as HTMLButtonElement).style.color = "var(--studio-text-dim)";
+                }}
+              >
+                Clear History
+              </button>
+            )}
             <span style={{ fontSize: 11, opacity: 0.5 }}>
               DATASET: {activeRepo?.dataset_name || "—"}
             </span>
@@ -633,24 +732,57 @@ export default function StudioPage() {
               </div>
             )}
 
-            {messages.map((msg, i) => (
+            {messages.map((msg, i) => {
+              const isBot = msg.role === "assistant";
+              return (
               <div
                 key={i}
                 className={`msg ${msg.role === "user" ? "msg-user" : "msg-bot"} fade-in-up`}
                 style={{ animationDelay: `${i * 50}ms` }}
               >
-                {msg.content}
+                  <div 
+                    className="markdown-content"
+                    dangerouslySetInnerHTML={{ __html: marked.parse(msg.content || "") as string }} 
+                  />
+
+                  {isBot && msg.reasoning_steps && msg.reasoning_steps.length > 0 && (
+                    <details style={{ marginTop: "0.75rem", fontSize: 11, color: "var(--studio-text-dim)" }}>
+                      <summary style={{ cursor: "pointer", outline: "none", userSelect: "none", color: "var(--studio-accent)" }}>
+                        View Reasoning Trace
+                      </summary>
+                      <div style={{ 
+                        marginTop: "0.375rem", 
+                        padding: "0.625rem", 
+                        background: "var(--studio-surface)", 
+                        border: "1px solid var(--studio-border)", 
+                        borderRadius: 6,
+                        fontFamily: "var(--font-mono)",
+                        lineHeight: "1.4"
+                      }}>
+                        {msg.reasoning_steps.map((step, idx) => (
+                          <div key={idx} style={{ marginBottom: "0.25rem" }}>{step}</div>
+                        ))}
+                      </div>
+                    </details>
+                  )}
+
                 {msg.sources && msg.sources.length > 0 && (
                   <div style={{ marginTop: "0.5rem", display: "flex", flexWrap: "wrap", gap: 4 }}>
                     {msg.sources.map((s, j) => (
-                      <span key={j} className="msg-citation">
+                        <span 
+                          key={j} 
+                          className="msg-citation"
+                          onClick={() => setSelectedSource(s)}
+                          style={{ cursor: "pointer" }}
+                        >
                         {s.title}
                       </span>
                     ))}
                   </div>
                 )}
               </div>
-            ))}
+              );
+            })}
 
             {loading && (
               <div className="msg msg-bot fade-in-up" style={{ display: "flex", gap: 6, padding: "0.75rem 1rem" }}>
@@ -682,7 +814,7 @@ export default function StudioPage() {
       </main>
 
       {/* ── Source Panel ────────────────────────────────────────── */}
-      <aside className="source-panel">
+      <aside className="source-panel" style={{ overflowY: "auto", maxHeight: "100vh" }}>
         <h3
           style={{
             fontSize: 11,
@@ -693,8 +825,52 @@ export default function StudioPage() {
             marginBottom: "1rem",
           }}
         >
-          Sources
+          Sources & Reasonings
         </h3>
+
+        {selectedSource && (
+          <div className="source-detail-card fade-in-up" style={{ 
+            padding: "1rem",
+            background: "var(--studio-surface)",
+            border: "1px solid var(--studio-accent)",
+            borderRadius: 8,
+            marginBottom: "1.5rem",
+            fontSize: 12
+          }}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "0.5rem" }}>
+              <strong style={{ color: "var(--studio-accent)", fontSize: 13 }}>{selectedSource.title}</strong>
+              <button 
+                onClick={() => setSelectedSource(null)}
+                style={{
+                  background: "transparent",
+                  border: "none",
+                  color: "var(--studio-text-dim)",
+                  cursor: "pointer",
+                  fontSize: 12
+                }}
+              >
+                ✕ Close
+              </button>
+            </div>
+            <div style={{ color: "var(--studio-text-dim)", fontSize: 11, marginBottom: "0.75rem" }}>
+              Type: {selectedSource.type} &bull; Relevance: {Math.round(selectedSource.relevance * 100)}%
+            </div>
+            <div style={{ 
+              background: "var(--studio-bg)", 
+              padding: "0.75rem", 
+              borderRadius: 6, 
+              border: "1px solid var(--studio-border)",
+              fontFamily: "var(--font-mono)",
+              fontSize: 11,
+              lineHeight: 1.4,
+              overflowWrap: "anywhere",
+              whiteSpace: "pre-wrap",
+              color: "var(--studio-text)"
+            }}>
+              {selectedSource.context_snippet || "No additional text snippet available."}
+            </div>
+          </div>
+        )}
 
         {sources.length === 0 ? (
           <div
@@ -710,8 +886,21 @@ export default function StudioPage() {
             when you ask a question.
           </div>
         ) : (
-          sources.map((s, i) => (
-            <div key={i} className="source-card fade-in-up" style={{ animationDelay: `${i * 80}ms` }}>
+          <div style={{ display: "flex", flexDirection: "column", gap: "0.75rem" }}>
+            <span style={{ fontSize: 10, color: "var(--studio-text-dim)", fontWeight: 500 }}>
+              CLICK CARD TO VIEW DETAILED REASONING SNIPPET:
+            </span>
+            {sources.map((s, i) => (
+              <div 
+                key={i} 
+                className="source-card fade-in-up" 
+                onClick={() => setSelectedSource(s)}
+                style={{ 
+                  animationDelay: `${i * 80}ms`,
+                  cursor: "pointer",
+                  border: selectedSource?.title === s.title ? "1px solid var(--studio-accent)" : "1px solid var(--studio-border)"
+                }}
+              >
               <div className="source-card-title">{s.title}</div>
               <div className="source-card-meta">
                 <span>Type: {s.type}</span>
@@ -719,7 +908,8 @@ export default function StudioPage() {
                 <span>Relevance: {Math.round(s.relevance * 100)}%</span>
               </div>
             </div>
-          ))
+            ))}
+          </div>
         )}
       </aside>
     </div>

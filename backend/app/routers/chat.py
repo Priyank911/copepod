@@ -15,8 +15,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.config import get_settings
 from app.database import get_db
-from app.models.models import Repo, User
-from app.schemas.schemas import ChatRequest, ChatResponse, SourceCitation
+from app.models.models import Repo, User, ChatMessage
+from app.schemas.schemas import ChatRequest, ChatResponse, SourceCitation, ChatMessageOut
 from app.services import cognee_service
 from app.utils.auth import get_current_user
 
@@ -46,26 +46,73 @@ async def chat(
     if not repo.is_ingested:
         raise HTTPException(status.HTTP_425_TOO_EARLY, "Repo is still being ingested")
 
+    reasoning_steps = [
+        f"Query initiated: '{body.query}'",
+        f"Step 1: Routed dataset target to isolated environment '{repo.dataset_name}'",
+        f"        Graph DB target: '/app/.cognee/databases/isolated_graphs/{repo.dataset_name}.db'",
+        f"        Vector DB target: '/app/.cognee/databases/isolated_vectors/{repo.dataset_name}'"
+    ]
+
     # 1. Recall from Cognee
     raw_results = await cognee_service.recall(body.query, repo.dataset_name)
 
     if not raw_results:
+        reasoning_steps.append("Step 2: Triplets search resolved on empty context.")
+        answer = "I don't have enough context about this repository to answer that question. Try a different question or wait for the ingestion to complete."
+        
+        user_msg = ChatMessage(
+            user_id=user.id,
+            repo_id=repo.id,
+            role="user",
+            content=body.query,
+        )
+        db.add(user_msg)
+        
+        bot_msg = ChatMessage(
+            user_id=user.id,
+            repo_id=repo.id,
+            role="assistant",
+            content=answer,
+            sources=[],
+            reasoning_steps=reasoning_steps,
+        )
+        db.add(bot_msg)
+        await db.commit()
+
         return ChatResponse(
-            answer="I don't have enough context about this repository to answer that question. "
-                   "Try a different question or wait for the ingestion to complete.",
+            answer=answer,
             sources=[],
             dataset=repo.dataset_name,
             query=body.query,
+            reasoning_steps=reasoning_steps,
+            raw_contexts=[],
         )
 
+    reasoning_steps.append(
+        f"Step 2: Retrieved {len(raw_results)} entity/edge triplets from isolated Kuzu graph."
+    )
+    for idx, r in enumerate(raw_results[:6]):
+        text_val = str(r).strip()
+        if len(text_val) > 180:
+            snippet = text_val[:177] + "..."
+        else:
+            snippet = text_val
+        reasoning_steps.append(f"        └─ Traversed: {snippet}")
+
     # 2. Format context for LLM
-    context = "\n\n".join(str(r) for r in raw_results[:10])
+    context_items = []
+    raw_contexts = []
+    for r in raw_results[:10]:
+        text_val = str(r)
+        context_items.append(text_val)
+        raw_contexts.append(text_val)
+
+    context = "\n\n".join(context_items)
+    reasoning_steps.append(f"Step 3: Compiled {len(context_items)} context chunks for LLM instruction.")
 
     # 3. Generate answer via Gemini
     try:
-        from google import genai
-
-        client = genai.Client(api_key=settings.GEMINI_API_KEY)
+        from app.utils.gemini_fallback import generate_content_with_fallback
 
         system_prompt = (
             "You are a code repository expert. Answer concisely using ONLY "
@@ -76,8 +123,8 @@ async def chat(
 
         user_prompt = f"Context from repository '{repo.full_name}':\n{context}\n\nQuestion: {body.query}"
 
-        response = client.models.generate_content(
-            model="gemini-3.5-flash",
+        reasoning_steps.append("Step 4: Executing LLM generation via Gemini fallback layer...")
+        response = generate_content_with_fallback(
             contents=user_prompt,
             config={
                 "system_instruction": system_prompt,
@@ -87,21 +134,100 @@ async def chat(
         )
 
         answer = response.text or "Unable to generate answer."
+        reasoning_steps.append("Step 5: Completion generated successfully.")
 
     except Exception as e:
         logger.exception("Gemini API error: %s", e)
+        reasoning_steps.append(f"Step 4/5: Gemini API execution failed with error: {str(e)[:100]}. Triggering raw fallback formatting.")
         # Fallback: return raw context if LLM fails
         answer = f"Context found but answer formatting failed. Here's what I found:\n\n{context[:1000]}"
 
     # 4. Extract source citations from raw results
     sources = _extract_sources(raw_results)
 
+    # Save user message to database
+    user_msg = ChatMessage(
+        user_id=user.id,
+        repo_id=repo.id,
+        role="user",
+        content=body.query,
+    )
+    db.add(user_msg)
+
+    # Save bot response to database
+    sources_dict_list = [s.model_dump() for s in sources]
+    bot_msg = ChatMessage(
+        user_id=user.id,
+        repo_id=repo.id,
+        role="assistant",
+        content=answer,
+        sources=sources_dict_list,
+        reasoning_steps=reasoning_steps,
+    )
+    db.add(bot_msg)
+    await db.commit()
+
     return ChatResponse(
         answer=answer,
         sources=sources,
         dataset=repo.dataset_name,
         query=body.query,
+        reasoning_steps=reasoning_steps,
+        raw_contexts=raw_contexts,
     )
+
+
+@router.get("/{repo_id}/chat/history", response_model=list[ChatMessageOut])
+async def get_chat_history(
+    repo_id: int,
+    user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """
+    Get chat history for a specific repository.
+    Fetches the last 100 messages for the current user and repository.
+    """
+    from sqlalchemy import select
+
+    repo = await db.get(Repo, repo_id)
+    if not repo or repo.user_id != user.id:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "Repo not found")
+
+    stmt = (
+        select(ChatMessage)
+        .where(ChatMessage.user_id == user.id, ChatMessage.repo_id == repo_id)
+        .order_by(ChatMessage.created_at.desc())
+        .limit(100)
+    )
+    result = await db.execute(stmt)
+    messages = result.scalars().all()
+    # Reverse so they are chronological in the response
+    return list(reversed(messages))
+
+
+@router.delete("/{repo_id}/chat/history")
+async def clear_chat_history(
+    repo_id: int,
+    user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """
+    Clear all chat messages for a repository.
+    """
+    from sqlalchemy import delete
+
+    repo = await db.get(Repo, repo_id)
+    if not repo or repo.user_id != user.id:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "Repo not found")
+
+    stmt = delete(ChatMessage).where(
+        ChatMessage.user_id == user.id,
+        ChatMessage.repo_id == repo_id,
+    )
+    await db.execute(stmt)
+    await db.commit()
+
+    return {"status": "success", "message": "Chat history cleared successfully."}
 
 
 @router.get("/{repo_id}/file-context")
@@ -191,6 +317,7 @@ def _extract_sources(results: list) -> list[SourceCitation]:
                     type="pr",
                     title=f"PR #{match.group(1)}",
                     relevance=0.8,
+                    context_snippet=text[:350] + "..." if len(text) > 350 else text,
                 ))
 
         # Find issue references
@@ -202,6 +329,7 @@ def _extract_sources(results: list) -> list[SourceCitation]:
                     type="issue",
                     title=f"Issue #{match.group(1)}",
                     relevance=0.7,
+                    context_snippet=text[:350] + "..." if len(text) > 350 else text,
                 ))
 
     return sources[:10]  # Cap at 10 sources

@@ -24,11 +24,23 @@ def format_pr(
     merged_at: datetime | None,
     files: list[str],
     reviews: list[dict[str, Any]] | None = None,
+    diff_analysis: str | None = None,
 ) -> str:
     """Convert a merged PR into a structured sentence for Cognee ingestion."""
     linked = _extract_linked_issues(body or "")
     file_list = ", ".join(files[:8]) if files else "unknown files"
-    rationale = _truncate(body or "No rationale provided", 400)
+    
+    clean_body = (body or "").strip()
+    if not clean_body or len(clean_body) < 30:
+        if diff_analysis:
+            rationale = diff_analysis
+        else:
+            rationale = "No detailed description provided by author."
+    else:
+        rationale = _truncate(clean_body, 400)
+        if diff_analysis:
+            rationale += f" Technical Changes: {diff_analysis}"
+            
     date_str = merged_at.strftime("%Y-%m-%d") if merged_at else "unknown date"
 
     review_text = ""
